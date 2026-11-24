@@ -594,7 +594,8 @@ function renderResults() {
   const cur = state.settings.currency;
   el.innerHTML = trips.map(t => {
     const trip = state.trips.find(x => x.name === t.trip) || {};
-    const when = trip.depart_from ? `יציאה בין ${fmtDate(trip.depart_from)} ל-${fmtDate(trip.depart_to)}` +
+    const when = trip.depart_from ? (trip.one_way ? `יציאה בין ${fmtDate(trip.depart_from)} ל-${fmtDate(trip.depart_to)}`
+        : `בין ${fmtDate(trip.depart_from)} ל-${fmtDate(trip.depart_to)}`) +
       (trip.one_way ? " · כיוון אחד" : ` · ${trip.min_nights}${trip.max_nights !== trip.min_nights ? "–" + trip.max_nights : ""} לילות`) : "";
     // Cheapest option first, so the destinations compare at a glance.
     const sorted = t.destinations.slice().sort((a, b) =>
@@ -631,13 +632,16 @@ function renderResults() {
 function toggleOpen(key) { open[key] = !open[key]; renderResults(); }
 
 /* ---------- trips ---------- */
-function combos(t) {
+function combos(t) {   // same count as the Python planner: the whole trip inside the dates
   if (!t.depart_from || !t.depart_to) return 0;
-  const days = Math.round((new Date(t.depart_to) - new Date(t.depart_from)) / 864e5) + 1;
-  if (days < 1) return 0;
-  if (t.one_way) return days;
-  const n = Math.max(0, (+t.max_nights || 0) - (+t.min_nights || 0) + 1);
-  return days * n + (t.split_tickets ? days + days + n - 1 : 0);
+  const span = Math.round((new Date(t.depart_to) - new Date(t.depart_from)) / 864e5);
+  if (span < 0) return 0;
+  if (t.one_way) return span + 1;
+  const lo = +t.min_nights || 0, hi = +t.max_nights || 0;
+  let n = 0;
+  for (let k = lo; k <= hi; k++) n += Math.max(0, span - k + 1);
+  const legs = Math.max(0, span - lo + 1);
+  return n + (t.split_tickets && legs ? 2 * legs : 0);
 }
 
 function renderTrips() {
@@ -645,7 +649,7 @@ function renderTrips() {
   const list = state.trips.map((t, i) => `
     <div class="card ${t.enabled ? "" : "off"}"><div class="trip-row">
       <div class="grow"><h2>${esc(t.name)}${t.enabled ? "" : ' <span class="tag">מושהה</span>'}</h2>
-        <div class="sub">מ-${esc(t.origins.map(c => AIRPORTS[c] || c).join(" / "))} · יציאה ${fmtDate(t.depart_from)}–${fmtDate(t.depart_to)}
+        <div class="sub">מ-${esc(t.origins.map(c => AIRPORTS[c] || c).join(" / "))} · ${t.one_way ? "יציאה " : ""}${fmtDate(t.depart_from)}–${fmtDate(t.depart_to)}
         ${t.one_way ? "· כיוון אחד" : `· ${t.min_nights}–${t.max_nights} לילות`}
         ${t.max_stops === 0 ? "· ישירות בלבד" : t.max_stops != null ? `· עד ${t.max_stops} עצירות` : ""}
         ${t.target_price ? `· מחיר יעד ${money(t.target_price, state.settings.currency)}` : ""}
@@ -690,8 +694,8 @@ function tripForm() {
               REGIONS.filter(r => r.country === c).map(r => `<option>${esc(r.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
         <div id="regionBox"></div>
         <div class="chips" id="destChips"></div></div>
-      <div><label>יציאה – התאריך המוקדם ביותר</label><input type="date" name="depart_from" value="${esc(t.depart_from)}"></div>
-      <div><label>יציאה – התאריך המאוחר ביותר</label><input type="date" name="depart_to" value="${esc(t.depart_to)}"></div>
+      <div><label>יציאה – לא לפני</label><input type="date" name="depart_from" value="${esc(t.depart_from)}"></div>
+      <div><label id="endLabel">חזרה – לא אחרי</label><input type="date" name="depart_to" value="${esc(t.depart_to)}"></div>
       <div id="nightsBox"><label>מספר לילות</label><div class="inline">
         <span>מ-</span><input type="number" name="min_nights" min="1" max="60" value="${esc(t.min_nights)}">
         <span>עד</span><input type="number" name="max_nights" min="1" max="60" value="${esc(t.max_nights)}"></div></div>
@@ -733,6 +737,7 @@ function bindForm() {
     readForm();
     $("#nightsBox").style.display = editing.one_way ? "none" : "";
     $("#splitBox").style.display = editing.one_way ? "none" : "";
+    $("#endLabel").textContent = editing.one_way ? "יציאה – לא אחרי" : "חזרה – לא אחרי";
     $("#destChips").innerHTML = editing.destinations.map((d, i) =>
       `<span class="chip">${esc(cityName(d))} <span class="ltr">${esc(destCodes(d))}</span><button type="button" onclick="removeDest(${i})" title="הסר">×</button></span>`).join("");
     const c = combos(editing), n = editing.destinations.length;
@@ -831,6 +836,8 @@ function validate(t) {
   if (!t.depart_from || !t.depart_to) return "צריך לבחור טווח תאריכי יציאה.";
   if (t.depart_to < t.depart_from) return "התאריך המאוחר מוקדם מהתאריך המוקדם.";
   if (!t.one_way && (t.min_nights < 1 || t.max_nights < t.min_nights)) return "טווח הלילות לא תקין.";
+  if (!t.one_way && (new Date(t.depart_to) - new Date(t.depart_from)) / 864e5 < t.min_nights)
+    return "בין שני התאריכים אין מספיק לילות לטיול הקצר ביותר שבחרת.";
   const others = state.trips.filter((_, i) => i !== editingIndex);
   if (others.some(o => o.name === t.name)) return "כבר יש טיול בשם הזה.";
   return null;
