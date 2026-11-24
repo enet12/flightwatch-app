@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מעקב מחירי טיסות</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E✈%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #fff; --ink: #18212b; --muted: #637083; --line: #e2e7ed;
+    --accent: #1f6feb; --accent-ink: #fff; --good: #137a3a; --good-bg: #e7f5ec;
+    --warn: #8a5a00; --warn-bg: #fff4d6; --bad: #b42318; --bad-bg: #fdecea; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+  .bar { max-width: 1040px; margin: 0 auto; padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  h1 { font-size: 19px; margin: 0; flex: 1; white-space: nowrap; }
+  .auto { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #9aa5b1; }
+  .dot.on { background: #1a9f4b; }
+  .usage { font-size: 13px; color: var(--muted); min-width: 210px; }
+  .meter { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .meter > div { height: 100%; background: var(--accent); }
+  nav { max-width: 1040px; margin: 0 auto; padding: 0 20px; display: flex; gap: 4px; }
+  nav button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 14px;
+               font: inherit; color: var(--muted); cursor: pointer; }
+  nav button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  main { max-width: 1040px; margin: 0 auto; padding: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 17px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  button.btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+               border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+  button.btn:hover { border-color: #b8c2cd; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button.primary:hover { filter: brightness(1.08); }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .55; cursor: default; }
+  .banner { border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  .banner.bad { background: var(--bad-bg); color: var(--bad); }
+  .banner.good { background: var(--good-bg); color: var(--good); }
+  .banner .grow { flex: 1; min-width: 220px; }
+  a { color: var(--accent); }
+
+  /* results */
+  .dest { display: grid; grid-template-columns: 150px 120px 1fr 130px; gap: 14px; align-items: center;
+          padding: 12px 0; border-top: 1px solid var(--line); }
+  .dest:first-of-type { border-top: 0; }
+  .dname { font-weight: 600; }
+  .dcode { color: var(--muted); font-size: 12px; direction: ltr; text-align: right; }
+  .price { font-size: 22px; font-weight: 700; direction: ltr; text-align: right; }
+  .price.none { font-size: 14px; font-weight: 400; color: var(--muted); }
+  .detail { font-size: 13px; }
+  .detail .when { font-weight: 600; }
+  .cover { font-size: 12px; color: var(--muted); }
+  .cover .meter { height: 4px; width: 120px; }
+  .more { grid-column: 1 / -1; font-size: 13px; background: var(--bg); border-radius: 8px; padding: 8px 12px; }
+  .more table { width: 100%; border-collapse: collapse; }
+  .more td { padding: 4px 6px; border-top: 1px solid var(--line); vertical-align: top; }
+  .more tr:first-child td { border-top: 0; }
+  .best { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--good-bg); color: var(--good); margin-top: 3px; }
+  .site { margin-top: 12px; padding: 12px; border-radius: 8px; background: #eef4fe; }
+  .qr { margin-top: 10px; } .qr img, .qr canvas { background: #fff; padding: 8px; border-radius: 8px; }
+  .land { font-size: 12px; color: var(--good); }
+  .regionbox { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 8px; background: #fafbfc; }
+  .regionbox .ap { display: flex; align-items: center; gap: 4px; font-size: 14px; padding: 2px 0; }
+  .regionbox .ap .sub { margin-inline-start: 6px; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); margin-inline-start: 4px; }
+  .linkbtn { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
+  svg.spark { width: 130px; height: 34px; }
+
+  /* trips */
+  .trip-row { display: flex; gap: 12px; align-items: flex-start; }
+  .trip-row .grow { flex: 1; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chip { background: #eaf1fe; color: #194a9c; border-radius: 14px; padding: 2px 10px; font-size: 13px; }
+  .chip button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0 4px 0 0; font-size: 14px; }
+  .off { opacity: .55; }
+  form .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px 18px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, select { font: inherit; width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  input[type=checkbox], input[type=radio] { width: auto; margin-inline-end: 6px; flex: none; }
+  input:focus, select:focus { outline: 2px solid #b6d0fb; border-color: var(--accent); }
+  .ltr { direction: ltr; text-align: right; }
+  .full { grid-column: 1 / -1; }
+  .inline { display: flex; gap: 8px; align-items: center; }
+  .check { display: flex; align-items: center; color: var(--ink); font-size: 14px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .err { color: var(--bad); font-size: 14px; margin-top: 10px; }
+  pre { background: #0f1720; color: #d7e0ea; padding: 12px; border-radius: 8px; overflow: auto; max-height: 340px;
+        font-size: 12px; direction: ltr; text-align: left; white-space: pre-wrap; }
+  .empty { text-align: center; padding: 36px 10px; color: var(--muted); }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #18212b; color: #fff;
+           padding: 9px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 760px) {
+    .dest { grid-template-columns: 1fr 1fr; }
+    .dest .detail { grid-column: 1 / -1; }
+    .bar { padding: 10px 14px; gap: 10px; } main { padding: 14px; }
+    .dest .spark-wrap { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>✈ מעקב מחירי טיסות</h1>
+    <div class="usage" id="usage"></div>
+    <div class="auto" id="autoBox"></div>
+    <button class="btn primary" id="checkBtn">בדוק עכשיו</button>
+  </div>
+  <nav>
+    <button data-tab="results" class="on">תוצאות</button>
+    <button data-tab="trips">טיולים</button>
+    <button data-tab="settings">הגדרות</button>
+  </nav>
+</header>
+<main>
+  <div id="banners"></div>
+  <section id="tab-results"></section>
+  <section id="tab-trips" hidden></section>
+  <section id="tab-settings" hidden></section>
+</main>
+<div class="toast" id="toast"></div>
+
+<datalist id="airports"></datalist>
+
+<script>
+const TOKEN = "";
+const AIRPORTS = {
+  TLV: "תל אביב", ETM: "אילת (רמון)", VIE: "וינה", INN: "אינסברוק", SZG: "זלצבורג", MUC: "מינכן",
+  AMS: "אמסטרדם", EIN: "איינדהובן", RTM: "רוטרדם", BRU: "בריסל", CRL: "בריסל שרלרואה",
+  KRK: "קרקוב", WAW: "ורשה", WMI: "ורשה מודלין", KTW: "קטוביץ", GDN: "גדנסק", WRO: "ורוצלב",
+  BTS: "ברטיסלבה", KSC: "קושיצה", BUD: "בודפשט", PRG: "פראג", ATH: "אתונה", SKG: "סלוניקי",
+  RHO: "רודוס", HER: "כרתים (הרקליון)", CHQ: "כרתים (חאניה)", JTR: "סנטוריני", LCA: "לרנקה", PFO: "פאפוס",
+  FCO: "רומא", CIA: "רומא צ'אמפינו", MXP: "מילאנו", BGY: "מילאנו ברגמו", LIN: "מילאנו לינאטה",
+  VCE: "ונציה", TSF: "ונציה טרוויזו", NAP: "נאפולי", BLQ: "בולוניה", PSA: "פיזה", FLR: "פירנצה",
+  CTA: "קטניה", PMO: "פלרמו", BCN: "ברצלונה", MAD: "מדריד", LIS: "ליסבון", OPO: "פורטו",
+  CDG: "פריז", ORY: "פריז אורלי", NCE: "ניס", LYS: "ליון", LHR: "לונדון הית'רו", LGW: "לונדון גטוויק",
+  STN: "לונדון סטנסטד", LTN: "לונדון לוטון", BER: "ברלין", FRA: "פרנקפורט", DUS: "דיסלדורף", CGN: "קלן",
+  HAM: "המבורג", NUE: "נירנברג", STR: "שטוטגרט", ZRH: "ציריך", GVA: "ז'נבה", BSL: "באזל",
+  LJU: "ליובליאנה", ZAG: "זאגרב", DBV: "דוברובניק", SPU: "ספליט", TIV: "טיבאט", TIA: "טירנה",
+  SOF: "סופיה", OTP: "בוקרשט", BEG: "בלגרד", TBS: "טביליסי", BUS: "בטומי", EVN: "ירוואן",
+  IST: "איסטנבול", SAW: "איסטנבול סביחה", CPH: "קופנהגן", OSL: "אוסלו", ARN: "שטוקהולם",
+  HEL: "הלסינקי", RIX: "ריגה", DUB: "דבלין", EDI: "אדינבורו", DXB: "דובאי", AUH: "אבו דאבי",
+  GRZ: "גראץ", LNZ: "לינץ", KLU: "קלגנפורט", MMG: "ממינגן", FDH: "פרידריכסהאפן", BZO: "בולצאנו",
+  VRN: "ורונה", TRS: "טריאסטה", TAT: "פופרד", NRN: "ויזה (דיסלדורף)", BVA: "פריז בובה", LCY: "לונדון סיטי",
+  BRQ: "ברנו", DRS: "דרזדן", ZAD: "זאדאר", PUY: "פולה", RJK: "ריאקה", KUT: "קוטאיסי", GRO: "חירונה",
+  REU: "ריאוס", FAO: "פארו", TGD: "פודגוריצה", BKK: "בנגקוק", HKT: "פוקט", JFK: "ניו יורק", EWR: "ניו יורק ניוארק", MIA: "מיאמי", LAX: "לוס אנג'לס",
+};
+
+/* Regions: airports that serve an area, with rough drive time by car. [code, note, on by default] */
+const REGIONS = [
+  { name: "טירול", airports: [["INN", "בלב טירול", 1], ["MUC", "כ-2 שעות לאינסברוק", 1], ["SZG", "כ-2 שעות לאינסברוק", 1],
+      ["MMG", "כ-2.5 שעות לאינסברוק", 1], ["VRN", "כ-3 שעות לאינסברוק", 0], ["ZRH", "כ-3.5 שעות לאינסברוק", 0]] },
+  { name: "אוסטריה (כל המדינה)", airports: [["VIE", "וינה", 1], ["SZG", "זלצבורג", 1], ["INN", "טירול", 1], ["GRZ", "גראץ", 1],
+      ["LNZ", "לינץ", 0], ["KLU", "קרינתיה", 0], ["BTS", "כשעה לווינה", 1], ["MUC", "כ-1.5 שעות לזלצבורג", 1]] },
+  { name: "זלצבורג והאגמים", airports: [["SZG", "בזלצבורג", 1], ["MUC", "כ-1.5 שעות לזלצבורג", 1], ["LNZ", "כ-1.5 שעות לזלצבורג", 1],
+      ["VIE", "כ-3 שעות לזלצבורג", 0], ["INN", "כ-2 שעות לזלצבורג", 0]] },
+  { name: "וינה והסביבה", airports: [["VIE", "בווינה", 1], ["BTS", "כשעה לווינה", 1], ["BUD", "כ-2.5 שעות לווינה", 0]] },
+  { name: "בוואריה", airports: [["MUC", "מינכן", 1], ["MMG", "כ-1.5 שעות למינכן", 1], ["NUE", "כ-1.5 שעות למינכן", 1],
+      ["SZG", "כ-1.5 שעות למינכן", 1], ["STR", "כ-2.5 שעות למינכן", 0]] },
+  { name: "שווייץ", airports: [["ZRH", "ציריך", 1], ["GVA", "ז'נבה", 1], ["BSL", "באזל", 1], ["MXP", "כשעה ללוגאנו", 0], ["FDH", "כ-1.5 שעות לציריך", 0]] },
+  { name: "דולומיטים", airports: [["VRN", "כ-2 שעות לבולצאנו", 1], ["INN", "כ-1.5 שעות לבולצאנו", 1], ["VCE", "כ-3 שעות לדולומיטים", 1],
+      ["TSF", "כ-2.5 שעות לדולומיטים", 1], ["BGY", "כ-3 שעות לבולצאנו", 0], ["MUC", "כ-3.5 שעות לבולצאנו", 0]] },
+  { name: "אגם גארדה", airports: [["VRN", "כחצי שעה לאגם", 1], ["BGY", "כשעה לאגם", 1], ["LIN", "כ-1.5 שעות לאגם", 1],
+      ["VCE", "כ-1.5-2 שעות לאגם", 1], ["MXP", "כ-2 שעות לאגם", 0], ["BLQ", "כ-1.5 שעות לאגם", 0]] },
+  { name: "הולנד", airports: [["AMS", "אמסטרדם", 1], ["EIN", "כ-1.5 שעות לאמסטרדם", 1], ["RTM", "כשעה לאמסטרדם", 1],
+      ["BRU", "כ-2.5 שעות לאמסטרדם", 1], ["CRL", "כ-3 שעות לאמסטרדם", 0], ["DUS", "כ-2.5 שעות לאמסטרדם", 1], ["NRN", "כ-2 שעות לאמסטרדם", 0]] },
+  { name: "קרקוב וזקופנה", airports: [["KRK", "קרקוב (כשעתיים לזקופנה)", 1], ["KTW", "כ-1.25 שעות לקרקוב", 1],
+      ["TAT", "כ-1.5 שעות לזקופנה", 0], ["WAW", "כ-3.5 שעות לקרקוב", 0]] },
+  { name: "סלובקיה והטטרה", airports: [["TAT", "פופרד, למרגלות הטטרה", 1], ["KSC", "כ-1.5 שעות לטטרה", 1], ["KRK", "כ-2.5 שעות לטטרה", 1],
+      ["KTW", "כ-3 שעות לטטרה", 0], ["BTS", "כ-4 שעות לטטרה", 1], ["BUD", "כ-4 שעות לטטרה", 0], ["VIE", "כ-4.5 שעות לטטרה", 0]] },
+  { name: "פראג", airports: [["PRG", "פראג", 1], ["DRS", "כ-2 שעות לפראג", 0], ["BRQ", "כ-2.5 שעות לפראג", 0], ["VIE", "כ-4 שעות לפראג", 0]] },
+  { name: "בודפשט", airports: [["BUD", "בודפשט", 1], ["BTS", "כ-2 שעות לבודפשט", 1], ["VIE", "כ-2.5 שעות לבודפשט", 1]] },
+  { name: "סלובניה", airports: [["LJU", "ליובליאנה", 1], ["TRS", "כשעה לליובליאנה", 1], ["KLU", "כשעה לליובליאנה", 1],
+      ["ZAG", "כ-1.5 שעות לליובליאנה", 1], ["VCE", "כ-2.5 שעות לליובליאנה", 1], ["GRZ", "כ-2 שעות לליובליאנה", 0]] },
+  { name: "קרואטיה – איסטריה", airports: [["PUY", "פולה", 1], ["RJK", "ריאקה", 1], ["TRS", "כ-1.5 שעות לאיסטריה", 1],
+      ["LJU", "כ-2 שעות לאיסטריה", 1], ["VCE", "כ-3 שעות לאיסטריה", 0], ["ZAG", "כ-2.5 שעות לאיסטריה", 0]] },
+  { name: "קרואטיה – דלמטיה", airports: [["SPU", "ספליט", 1], ["DBV", "דוברובניק", 1], ["ZAD", "זאדאר", 1]] },
+  { name: "רומא", airports: [["FCO", "פיומיצ'ינו", 1], ["CIA", "צ'אמפינו", 1]] },
+  { name: "מילאנו", airports: [["MXP", "מלפנסה", 1], ["BGY", "ברגמו", 1], ["LIN", "לינאטה", 1]] },
+  { name: "ונציה", airports: [["VCE", "מרקו פולו", 1], ["TSF", "טרוויזו", 1], ["VRN", "כ-1.5 שעות לוונציה", 0]] },
+  { name: "פריז", airports: [["CDG", "שארל דה גול", 1], ["ORY", "אורלי", 1], ["BVA", "בובה (כ-1.5 שעות לפריז)", 0]] },
+  { name: "לונדון", airports: [["LHR", "הית'רו", 1], ["LGW", "גטוויק", 1], ["STN", "סטנסטד", 1], ["LTN", "לוטון", 1], ["LCY", "לונדון סיטי", 0]] },
+  { name: "ברצלונה וקוסטה ברווה", airports: [["BCN", "ברצלונה", 1], ["GRO", "כ-1.25 שעות לברצלונה", 1], ["REU", "כ-1.5 שעות לברצלונה", 0]] },
+  { name: "פורטוגל", airports: [["LIS", "ליסבון", 1], ["OPO", "פורטו", 1], ["FAO", "אלגרבה", 1]] },
+  { name: "כרתים", airports: [["HER", "הרקליון", 1], ["CHQ", "חאניה", 1]] },
+  { name: "קפריסין", airports: [["LCA", "לרנקה", 1], ["PFO", "פאפוס", 1]] },
+  { name: "גאורגיה", airports: [["TBS", "טביליסי", 1], ["KUT", "קוטאיסי (כ-3 שעות לטביליסי)", 1], ["BUS", "בטומי", 1]] },
+  { name: "מונטנגרו", airports: [["TGD", "פודגוריצה", 1], ["TIV", "טיבאט", 1], ["DBV", "כשעה לקוטור", 1]] },
+];
+const MAX_PER_SEARCH = 7;
+const regionByName = name => REGIONS.find(r => r.name === name);
+const parseDest = s => { const i = s.indexOf(":"); return i < 0 ? { label: "", codes: s.split("/") } : { label: s.slice(0, i).trim(), codes: s.slice(i + 1).trim().split("/") }; };
+function noteFor(label, code) {
+  const r = regionByName(label); const a = r && r.airports.find(x => x[0] === code); return a ? a[1] : "";
+}
+const CURRENCY = { USD: "$", EUR: "€", ILS: "₪", GBP: "£" };
+const HOURS = [1, 2, 3, 4, 6, 8, 12, 24];
+
+let state = null;
+let editing = null;      // trip being edited (copy), or null
+let editingIndex = -1;   // -1 = new trip
+let open = {};           // destination rows expanded
+let pollTimer = null;
+
+const $ = (sel, el = document) => el.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (p, cur) => (CURRENCY[cur] || "") + Math.round(p).toLocaleString("en-US") + (CURRENCY[cur] ? "" : " " + cur);
+const cityName = dest => { const d = parseDest(dest); return d.label ||
+  d.codes.map(c => AIRPORTS[c] || c).filter((v, i, a) => a.indexOf(v) === i).join(" / "); };
+const destCodes = dest => parseDest(dest).codes.join("/");
+const fmtDate = iso => { const d = new Date(iso + "T00:00:00"); return d.toLocaleDateString("he-IL", { day: "numeric", month: "numeric" }); };
+const dayName = iso => new Date(iso + "T00:00:00").toLocaleDateString("he-IL", { weekday: "short" });
+function ago(h) {
+  if (h < 1) return "לפני פחות משעה";
+  if (h < 24) return `לפני ${Math.round(h)} שעות`;
+  const d = Math.round(h / 24); return d === 1 ? "לפני יום" : `לפני ${d} ימים`;
+}
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ===================== website mode: the page talks to GitHub directly ===================== */
+const MODE = "web";                 // "local" when served by flightwatch on the computer, "web" on the website
+const WEB = MODE === "web";
+const DEFAULT_REPO = "enet12/flightwatch";
+const STORE_KEY = "flightwatch-connection";
+
+/*TOML-START*/
+// Reads and writes the small subset of TOML that flightwatch's config.toml uses.
+function tomlValue(raw) {
+  const v = raw.trim();
+  if (v.startsWith('"')) {   // basic string with escapes
+    const map = { n: "\n", t: "\t", r: "\r", b: "\b", f: "\f", '"': '"', "\\": "\\" };
+    let out = "", i = 1;
+    while (i < v.length - 1) {
+      if (v[i] !== "\\") { out += v[i++]; continue; }
+      const n = v[i + 1];
+      if (n === "u") { out += String.fromCharCode(parseInt(v.substr(i + 2, 4), 16)); i += 6; continue; }
+      out += map[n] ?? n; i += 2;
+    }
+    return out;
+  }
+  if (v === "true" || v === "false") return v === "true";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (v.startsWith("[")) {
+    const inner = v.slice(1, -1).trim(), out = []; let cur = "", q = false, esc = false;
+    for (const ch of inner) {
+      if (q) { cur += ch; if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') q = false; }
+      else if (ch === '"') { q = true; cur += ch; }
+      else if (ch === ",") { if (cur.trim()) out.push(tomlValue(cur)); cur = ""; }
+      else cur += ch;
+    }
+    if (cur.trim()) out.push(tomlValue(cur));
+    return out;
+  }
+  const n = Number(v);
+  if (!Number.isNaN(n)) return n;
+  throw new Error("cannot read value: " + v);
+}
+function stripComment(line) {
+  let q = false, esc = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') q = false; }
+    else if (ch === '"') q = true;
+    else if (ch === "#") return line.slice(0, i);
+  }
+  return line;
+}
+function parseToml(text) {
+  const out = { settings: {}, watch: [] }; let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = stripComment(raw).trim();
+    if (!line) continue;
+    if (line === "[settings]") { cur = out.settings; continue; }
+    if (line === "[[watch]]") { cur = {}; out.watch.push(cur); continue; }
+    const i = line.indexOf("=");
+    if (i < 0 || !cur) continue;
+    cur[line.slice(0, i).trim()] = tomlValue(line.slice(i + 1));
+  }
+  return out;
+}
+const TRIP_KEYS = ["name", "enabled", "origins", "destinations", "depart_from", "depart_to", "min_nights",
+  "max_nights", "one_way", "max_stops", "target_price", "split_tickets"];
+function tomlOut(v) {
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(v);
+  if (Array.isArray(v)) return "[" + v.map(tomlOut).join(", ") + "]";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return String(v);
+  return JSON.stringify(String(v));
+}
+function dumpToml(settings, trips) {
+  const lines = ["# flightwatch settings. Edited by the flightwatch screen; you can also edit it by hand.", "", "[settings]"];
+  for (const [k, v] of Object.entries(settings)) if (v !== null && v !== undefined) lines.push(`${k} = ${tomlOut(v)}`);
+  for (const t of trips) {
+    lines.push("", "[[watch]]");
+    for (const k of TRIP_KEYS) if (t[k] !== null && t[k] !== undefined && t[k] !== "") lines.push(`${k} = ${tomlOut(t[k])}`);
+  }
+  return lines.join("\n") + "\n";
+}
+/*TOML-END*/
+
+const web = {
+  conn: null, sha: null, raw: null,
+  load() {
+    try {
+      const h = new URLSearchParams(location.hash.slice(1));
+      if (h.get("t")) {   // opened from the computer's link or QR code: remember it, then clear the address bar
+        localStorage.setItem(STORE_KEY, JSON.stringify({ repo: h.get("repo") || DEFAULT_REPO, token: h.get("t") }));
+        history.replaceState(null, "", location.pathname);
+      }
+      this.conn = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    } catch { this.conn = null; }
+    return this.conn;
+  },
+  save(repo, token) {
+    this.conn = { repo: repo.replace(/^https:\/\/github.com\//, "").replace(/\/$/, ""), token };
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(this.conn)); } catch {}
+  },
+  forget() { try { localStorage.removeItem(STORE_KEY); } catch {} this.conn = null; },
+  async gh(method, path, body) {
+    const r = await fetch(`https://api.github.com/repos/${this.conn.repo}${path}`, {
+      method, headers: { Authorization: `Bearer ${this.conn.token}`, Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28", ...(body ? { "Content-Type": "application/json" } : {}) },
+      body: body ? JSON.stringify(body) : undefined, cache: "no-store",
+    });
+    if (r.status === 204) return null;
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) throw Object.assign(new Error("GitHub לא מכיר את מפתח הגישה (שגוי או בוטל)"), { auth: true });
+    if (r.status === 404) return Object.assign({}, { __missing: true });
+    if (!r.ok) throw Object.assign(new Error(data.message || `GitHub ${r.status}`), { status: r.status });
+    return data;
+  },
+  async file(path) {
+    const j = await this.gh("GET", `/contents/${path}`);
+    if (!j || j.__missing) return null;
+    const bytes = Uint8Array.from(atob((j.content || "").replace(/\n/g, "")), c => c.charCodeAt(0));
+    return { text: new TextDecoder().decode(bytes), sha: j.sha };
+  },
+  async putConfig(message) {
+    const text = dumpToml(this.raw.settings, this.raw.watch);
+    const bytes = new TextEncoder().encode(text); let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
+    const body = { message, content: btoa(bin), sha: this.sha };
+    try { this.sha = (await this.gh("PUT", "/contents/config.toml", body)).content.sha; }
+    catch (e) {   // changed meanwhile (e.g. by a check): take the newest sha and write ours on top
+      if (e.status !== 409 && e.status !== 422) throw e;
+      body.sha = (await this.file("config.toml")).sha;
+      this.sha = (await this.gh("PUT", "/contents/config.toml", body)).content.sha;
+    }
+  },
+};
+
+function hoursBetween(runsPerDay) { return Math.max(1, Math.round(24 / Math.max(1, runsPerDay || 8))); }
+const SETTING_DEFAULTS = { currency: "USD", drop_percent: 10, runs_per_day: 8, max_searches_per_run: 6,
+  serpapi_monthly_budget: 240, min_recheck_hours: 12, auto_checks: true };
+
+async function webState() {
+  const [cfg, res, runsJ] = await Promise.all([web.file("config.toml"), web.file("results.json"),
+    web.gh("GET", "/actions/workflows/flightwatch.yml/runs?per_page=3")]);
+  if (!cfg) throw new Error("config.toml לא נמצא במאגר " + web.conn.repo);
+  web.raw = parseToml(cfg.text); web.sha = cfg.sha;
+  const s = { ...SETTING_DEFAULTS, ...web.raw.settings };
+  const data = res ? JSON.parse(res.text) : {};
+  const runs = (runsJ && runsJ.workflow_runs) || [];
+  const running = runs.some(r => ["queued", "in_progress", "waiting", "pending"].includes(r.status));
+  const trips = web.raw.watch.map(t => ({ enabled: true, origins: ["TLV"], destinations: [], min_nights: 0, max_nights: 0,
+    one_way: false, max_stops: null, target_price: null, split_tickets: false, ...t }));
+  const results = trips.map(t => {
+    const prev = (data.results || []).find(r => r.trip === t.name);
+    return { trip: t.name, enabled: t.enabled, destinations: t.destinations.map(dest => {
+      const d = parseDest(dest), name = d.label || d.codes.join("/");
+      const found = prev && prev.destinations.find(x => x.destination === name);
+      return found || { destination: name, label: d.label, airports: d.codes, options: [], trend: [],
+                        checked: 0, total: combos(t), hint_price: null };
+    }) };
+  });
+  const run = runs[0];
+  const now = new Date();
+  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthKey = now.toISOString().slice(0, 7);
+  const used = data.generated_at && data.generated_at.slice(0, 7) === monthKey ? (data.usage || {}).used || 0 : 0;
+  return {
+    version: PAGE_VERSION, config_error: null,
+    settings: Object.fromEntries(["currency", "drop_percent", "runs_per_day", "max_searches_per_run",
+      "serpapi_monthly_budget", "min_recheck_hours"].map(k => [k, s[k]])),
+    trips, keys: data.keys || { SERPAPI_KEY: true }, running, last_output: data.last_output || "",
+    schedule: { supported: true, installed: true, hours: hoursBetween(s.runs_per_day), enabled: s.auto_checks !== false },
+    cloud: { repo: web.conn.repo, url: `https://github.com/${web.conn.repo}`, error: null, running, web: true,
+      last_run: run ? { at: run.run_started_at || run.created_at, status: run.status, conclusion: run.conclusion, url: run.html_url } : null },
+    results,
+    usage: { used, budget: s.serpapi_monthly_budget, per_run: s.serpapi_monthly_budget / (Math.max(1, s.runs_per_day) * days) },
+  };
+}
+
+async function webApi(path, body) {
+  if (path === "/api/state") return webState();
+  if (path === "/api/trips") { web.raw.watch = body.trips; await web.putConfig("trips changed on the flightwatch website"); return { ok: true }; }
+  if (path === "/api/settings") {
+    Object.assign(web.raw.settings, body.settings);
+    await web.putConfig("settings changed on the flightwatch website");
+    return { ok: true, warning: Object.keys(body.keys || {}).length ? "מפתחות אפשר לשנות רק מהמסך שבמחשב" : null };
+  }
+  if (path === "/api/auto") {
+    web.raw.settings.auto_checks = !!body.enabled;
+    await web.putConfig("automatic checks " + (body.enabled ? "resumed" : "paused") + " on the website");
+    return { ok: true };
+  }
+  if (path === "/api/check") {
+    const info = await web.gh("GET", "");
+    await web.gh("POST", "/actions/workflows/flightwatch.yml/dispatches", { ref: info.default_branch || "main" });
+    return { ok: true };
+  }
+  if (path === "/api/cloud/refresh") return { ok: true };
+  throw new Error("לא זמין באתר. אפשר לעשות את זה מהמסך שבמחשב.");
+}
+
+async function api(path, body) {
+  if (WEB) return webApi(path, body);
+  const opts = body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json", "X-Token": TOKEN }, body: JSON.stringify(body),
+  };
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `שגיאה ${r.status}`);
+  return data;
+}
+
+const PAGE_VERSION = "0.6.0";
+function showProblem(msg) {
+  $("#banners").innerHTML = `<div class="banner bad"><div class="grow">${msg}</div></div>`;
+}
+window.addEventListener("error", e => showProblem(`משהו השתבש בהצגת המסך (${esc(e.message)}). נסי לסגור את החלון השחור של flightwatch ולפתוח שוב מהסמל.`));
+
+function webLogin(message) {
+  $("#banners").innerHTML = "";
+  for (const t of ["results", "trips", "settings"]) $("#tab-" + t).hidden = t !== "results";
+  $("#tab-results").innerHTML = `<div class="card" style="max-width:560px;margin:20px auto">
+    <h2>✈ התחברות</h2>
+    <div class="sub">האתר מתחבר למאגר ב-GitHub שבו רצות הבדיקות. הכי פשוט: במחשב, במסך flightwatch ← הגדרות ← ענן,
+      לוחצים "פתיחה בטלפון" וסורקים את הקוד. או ממלאים כאן ידנית:</div>
+    ${message ? `<div class="err">${esc(message)}</div>` : ""}
+    <div style="margin-top:12px"><label>המאגר</label><input id="wRepo" class="ltr" value="${esc(DEFAULT_REPO.startsWith("__") ? "" : DEFAULT_REPO)}" placeholder="username/flightwatch"></div>
+    <div style="margin-top:10px"><label>מפתח הגישה</label><input id="wToken" type="password" class="ltr" placeholder="github_pat_..."></div>
+    <div class="hint">המפתח נשמר רק בדפדפן הזה, ונשלח רק ל-GitHub.</div>
+    <div class="actions"><button class="btn primary" id="wGo">התחברות</button></div></div>`;
+  $("#wGo").onclick = () => { web.save($("#wRepo").value.trim(), $("#wToken").value.trim()); refresh(); };
+  $("#checkBtn").hidden = true; $("#autoBox").innerHTML = ""; $("#usage").innerHTML = "";
+}
+
+async function refresh() {
+  if (WEB && !web.conn && !web.load()) return webLogin();
+  try { state = await api("/api/state"); }
+  catch (e) {
+    if (WEB) { if (e.auth) { web.forget(); return webLogin(e.message); }
+      showProblem("אין חיבור ל-GitHub: " + esc(e.message)); clearTimeout(pollTimer); pollTimer = setTimeout(refresh, 30000); return; }
+    $("#banners").innerHTML = `<div class="banner bad">אין חיבור לשרת של הכלי. ודאי שהחלון של flightwatch פתוח.</div>`; return;
+  }
+  $("#checkBtn").hidden = false;
+  if (!WEB && state.version !== PAGE_VERSION) {
+    showProblem("flightwatch עודכן. סגרי את החלון השחור של flightwatch ופתחי שוב מהסמל בשולחן העבודה.");
+    return;
+  }
+  render();
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(refresh, state.running ? (WEB ? 10000 : 3000) : 60000);
+}
+
+/* ---------- header & banners ---------- */
+function renderHeader() {
+  const u = state.usage;
+  const pct = u.budget ? Math.min(100, 100 * u.used / u.budget) : 100;
+  $("#usage").innerHTML = `${u.used} מתוך ${u.budget} חיפושים החודש<div class="meter"><div style="width:${pct}%"></div></div>`;
+  const sch = state.schedule, on = sch.enabled;
+  $("#autoBox").innerHTML = `<span><span class="dot ${on ? "on" : ""}"></span>
+      ${on ? `בדיקה אוטומטית${state.cloud ? " בענן" : ""} כל ${sch.hours === 24 ? "יום" : sch.hours === 1 ? "שעה" : sch.hours + " שעות"}` : "בדיקה אוטומטית מושהית"}</span>
+    <button class="btn" id="autoBtn">${on ? "⏸ השהיה" : "▶ הפעלה"}</button>`;
+  $("#autoBtn").onclick = () => setAuto(!on);
+  const b = $("#checkBtn");
+  b.disabled = state.running || !state.keys.SERPAPI_KEY || !state.trips.some(t => t.enabled);
+  b.textContent = state.running ? "בודק..." : "בדוק עכשיו";
+}
+
+function renderBanners() {
+  const out = [];
+  if (state.config_error)
+    out.push(`<div class="banner bad"><div class="grow">בעיה בקובץ ההגדרות: ${esc(state.config_error)}</div></div>`);
+  if (!state.keys.SERPAPI_KEY)
+    out.push(`<div class="banner warn"><div class="grow"><b>צריך מפתח SerpApi כדי לקבל מחירים.</b> ההרשמה חינמית ונותנת 250 חיפושים בחודש.
+      <a href="https://serpapi.com/users/sign_up" target="_blank" rel="noopener">להרשמה</a>, ואחריה להעתיק את "Your Private API Key" ללשונית ההגדרות.</div>
+      <button class="btn" onclick="showTab('settings')">להגדרות</button></div>`);
+  if (state.cloud && state.cloud.error)
+    out.push(`<div class="banner bad"><div class="grow">אין חיבור לענן: ${esc(state.cloud.error)}. אם מפתח הגישה של GitHub פג, צרי מפתח חדש והדביקי אותו בהגדרות ← ענן.</div>
+      <button class="btn" onclick="showTab('settings')">להגדרות</button></div>`);
+  if (state.schedule.supported && state.schedule.enabled && !state.schedule.installed)
+    out.push(`<div class="banner warn"><div class="grow">הבדיקה האוטומטית עוד לא מוגדרת במחשב.</div>
+      <button class="btn" onclick="installSchedule()">להפעיל בדיקה כל ${state.schedule.hours} שעות</button></div>`);
+  if (state.keys.SERPAPI_KEY && !state.trips.length)
+    out.push(`<div class="banner good"><div class="grow">הכול מוכן. נשאר להוסיף טיול שאחריו לעקוב.</div>
+      <button class="btn primary" onclick="newTrip()">טיול חדש</button></div>`);
+  $("#banners").innerHTML = out.join("");
+}
+
+/* ---------- results ---------- */
+function spark(points) {
+  if (points.length < 2) return "";
+  const ys = points.map(p => p[1]), min = Math.min(...ys), max = Math.max(...ys), span = max - min || 1;
+  const w = 130, h = 34, step = w / (points.length - 1);
+  const pts = points.map((p, i) => `${(w - i * step).toFixed(1)},${(h - 4 - (p[1] - min) / span * (h - 8)).toFixed(1)}`).join(" ");
+  const last = pts.split(" ").pop().split(",");
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-label="מגמת מחיר"><polyline fill="none" stroke="#1f6feb" stroke-width="1.8" points="${pts}"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="2.6" fill="#1f6feb"/></svg>`;
+}
+
+function landing(p, dest) {
+  if (!dest || !dest.airports || dest.airports.length < 2 || !p.arr) return "";
+  const note = noteFor(dest.label, p.arr) || noteFor(dest.label, p.dep);
+  const code = dest.airports.includes(p.arr) ? p.arr : p.dep;
+  return `<br><span class="land">✈ נחיתה ב${esc(AIRPORTS[code] || code)} (${esc(code)})${note ? " · " + esc(note) : ""}</span>`;
+}
+function partText(p) {
+  const nights = p.ret ? Math.round((new Date(p.ret) - new Date(p.depart)) / 864e5) : null;
+  return p.ret
+    ? `<span class="when">${fmtDate(p.depart)} (${dayName(p.depart)}) – ${fmtDate(p.ret)} (${dayName(p.ret)})</span> · ${nights} לילות`
+    : `<span class="when">${fmtDate(p.depart)} (${dayName(p.depart)})</span> · כיוון אחד`;
+}
+
+function optionHtml(o, dest) {
+  if (!o.split) {
+    const p = o.parts[0];
+    return `${partText(p)}${landing(p, dest)}<br><span class="sub">${p.describe ? esc(p.describe) + " · " : ""}נבדק ${ago(p.age_hours)}</span>`;
+  }
+  const [a, b] = o.parts;
+  return `<span class="tag">שני כרטיסים נפרדים</span><br>
+    הלוך: ${partText(a)} – ${money(a.price, o.currency)} <a href="${esc(a.link)}" target="_blank" rel="noopener">פתח</a><br>
+    חזור: ${partText(b)} – ${money(b.price, o.currency)} <a href="${esc(b.link)}" target="_blank" rel="noopener">פתח</a>`;
+}
+
+function renderResults() {
+  const el = $("#tab-results");
+  const trips = state.results.filter(t => t.enabled);
+  if (!trips.length) {
+    el.innerHTML = `<div class="card empty">עוד אין טיולים פעילים.<br><br><button class="btn primary" onclick="newTrip()">הוספת טיול</button></div>`;
+    return;
+  }
+  const cur = state.settings.currency;
+  el.innerHTML = trips.map(t => {
+    const trip = state.trips.find(x => x.name === t.trip) || {};
+    const when = trip.depart_from ? `יציאה בין ${fmtDate(trip.depart_from)} ל-${fmtDate(trip.depart_to)}` +
+      (trip.one_way ? " · כיוון אחד" : ` · ${trip.min_nights}${trip.max_nights !== trip.min_nights ? "–" + trip.max_nights : ""} לילות`) : "";
+    // Cheapest option first, so the destinations compare at a glance.
+    const sorted = t.destinations.slice().sort((a, b) =>
+      (a.options[0]?.price ?? Infinity) - (b.options[0]?.price ?? Infinity));
+    const priced = sorted.filter(d => d.options.length).length;
+    const rows = sorted.map((d, idx) => {
+      const best = d.options[0];
+      const key = t.trip + "|" + d.destination;
+      const pct = d.total ? Math.round(100 * d.checked / d.total) : 0;
+      const priceCell = best ? `<div class="price">${money(best.price, best.currency)}</div><div class="sub">לנוסע מבוגר</div>`
+        : `<div class="price none">${d.total ? "עוד לא נבדק" : "התאריכים עברו"}</div>` +
+          (d.hint_price ? `<div class="sub">הערכה: ${money(d.hint_price, cur)}</div>` : "");
+      const detail = best ? optionHtml(best, d) +
+          (best.split ? "" : ` <a href="${esc(best.parts[0].link)}" target="_blank" rel="noopener">פתח ב-Google Flights</a>`) +
+          (d.options.length > 1 ? `<br><button class="linkbtn" onclick="toggleOpen('${esc(key)}')">${open[key] ? "הסתר" : "עוד " + (d.options.length - 1) + " אפשרויות"}</button>` : "")
+        : `<span class="sub">יגיע לתור בבדיקות הקרובות</span>`;
+      const more = open[key] && d.options.length > 1 ? `<div class="more"><table>${d.options.slice(1).map(o =>
+          `<tr><td style="width:90px;font-weight:600">${money(o.price, o.currency)}</td><td>${optionHtml(o, d)}${o.split ? "" :
+          ` <a href="${esc(o.parts[0].link)}" target="_blank" rel="noopener">פתח</a>`}</td></tr>`).join("")}</table></div>` : "";
+      return `<div class="dest">
+        <div><div class="dname">${esc(cityName(d.destination))}</div><div class="dcode">${esc((d.airports || [d.destination]).join(" · "))}</div>
+          ${idx === 0 && priced > 1 ? '<span class="best">הכי זול</span>' : ""}</div>
+        <div>${priceCell}</div>
+        <div class="detail">${detail}</div>
+        <div class="spark-wrap">${spark(d.trend)}
+          <div class="cover">נבדקו ${d.checked} מתוך ${d.total} שילובים<div class="meter"><div style="width:${pct}%"></div></div></div></div>
+        ${more}</div>`;
+    }).join("");
+    const note = t.destinations.length > 1 ? ` · ${t.destinations.length} יעדים אפשריים, מהזול ליקר` : "";
+    return `<div class="card"><h2>${esc(t.trip)}</h2><div class="sub">${when}${note}</div>${rows}</div>`;
+  }).join("") + `<div class="card"><h2>הבדיקה האחרונה${state.cloud ? " (בענן)" : ""}</h2><pre>${esc(state.last_output || "עוד לא הייתה בדיקה.")}</pre></div>`;
+}
+
+function toggleOpen(key) { open[key] = !open[key]; renderResults(); }
+
+/* ---------- trips ---------- */
+function combos(t) {
+  if (!t.depart_from || !t.depart_to) return 0;
+  const days = Math.round((new Date(t.depart_to) - new Date(t.depart_from)) / 864e5) + 1;
+  if (days < 1) return 0;
+  if (t.one_way) return days;
+  const n = Math.max(0, (+t.max_nights || 0) - (+t.min_nights || 0) + 1);
+  return days * n + (t.split_tickets ? days + days + n - 1 : 0);
+}
+
+function renderTrips() {
+  const el = $("#tab-trips");
+  const list = state.trips.map((t, i) => `
+    <div class="card ${t.enabled ? "" : "off"}"><div class="trip-row">
+      <div class="grow"><h2>${esc(t.name)}${t.enabled ? "" : ' <span class="tag">מושהה</span>'}</h2>
+        <div class="sub">מ-${esc(t.origins.map(c => AIRPORTS[c] || c).join(" / "))} · יציאה ${fmtDate(t.depart_from)}–${fmtDate(t.depart_to)}
+        ${t.one_way ? "· כיוון אחד" : `· ${t.min_nights}–${t.max_nights} לילות`}
+        ${t.max_stops === 0 ? "· ישירות בלבד" : t.max_stops != null ? `· עד ${t.max_stops} עצירות` : ""}
+        ${t.target_price ? `· מחיר יעד ${money(t.target_price, state.settings.currency)}` : ""}
+        ${t.split_tickets ? "· כולל שני כרטיסים נפרדים" : ""}</div>
+        <div class="chips">${t.destinations.map(d => `<span class="chip">${esc(cityName(d))}</span>`).join("")}</div>
+        <div class="hint">${t.destinations.length > 1 ? t.destinations.length + " אפשרויות ליעד · " : ""}${combos(t)} שילובי תאריכים לכל אפשרות</div></div>
+      <div class="inline">
+        <button class="btn" onclick="editTrip(${i})">עריכה</button>
+        <button class="btn" onclick="toggleTrip(${i})">${t.enabled ? "השהיה" : "הפעלה"}</button>
+        <button class="btn danger" onclick="deleteTrip(${i})">מחיקה</button>
+      </div></div></div>`).join("");
+  el.innerHTML = (editing ? tripForm() : `<div class="actions" style="margin:0 0 16px"><button class="btn primary" onclick="newTrip()">+ טיול חדש</button></div>`) +
+    (list || (editing ? "" : `<div class="card empty">אין עדיין טיולים.</div>`));
+  if (editing) bindForm();
+}
+
+function newTrip() {
+  const d = new Date(); d.setDate(d.getDate() + 60);
+  const iso = x => x.toISOString().slice(0, 10);
+  const to = new Date(d); to.setDate(to.getDate() + 7);
+  editing = { name: "", enabled: true, origins: ["TLV"], destinations: [], depart_from: iso(d), depart_to: iso(to),
+              min_nights: 4, max_nights: 7, one_way: false, max_stops: null, target_price: null, split_tickets: false };
+  editingIndex = -1; showTab("trips");
+}
+function editTrip(i) { editing = JSON.parse(JSON.stringify(state.trips[i])); editingIndex = i; renderTrips(); window.scrollTo(0, 0); }
+
+function tripForm() {
+  const t = editing;
+  return `<div class="card"><h2>${editingIndex < 0 ? "טיול חדש" : "עריכת טיול"}</h2><form id="tripForm" onsubmit="return false">
+    <div class="grid" style="margin-top:12px">
+      <div><label>שם הטיול</label><input name="name" value="${esc(t.name)}" placeholder="למשל: חופשה באוגוסט" required></div>
+      <div><label>יוצאים מ-</label><input name="origins" class="ltr" list="airports" value="${esc(t.origins.join("/"))}">
+        <div class="hint">קוד שדה תעופה, למשל TLV</div></div>
+      <div class="full"><label>יעדים אפשריים (לכל אחד יוצג מחיר, כדי שתוכלי להשוות ולבחור)</label>
+        <div class="inline"><input id="destInput" class="ltr" list="airports" placeholder="VIE" style="max-width:220px">
+          <button class="btn" type="button" id="addDest">הוסף יעד</button></div>
+        <div class="hint">אפשר לכתוב קוד או לבחור מהרשימה. לחיפוש משותף בכמה שדות של אותה עיר כותבים FCO/CIA.</div>
+        <div class="inline" style="margin-top:8px"><span class="sub">או לפי אזור:</span>
+          <select id="regionSel" style="max-width:260px"><option value="">בחירת אזור...</option>
+            ${REGIONS.map(r => `<option>${esc(r.name)}</option>`).join("")}</select></div>
+        <div id="regionBox"></div>
+        <div class="chips" id="destChips"></div></div>
+      <div><label>יציאה – התאריך המוקדם ביותר</label><input type="date" name="depart_from" value="${esc(t.depart_from)}"></div>
+      <div><label>יציאה – התאריך המאוחר ביותר</label><input type="date" name="depart_to" value="${esc(t.depart_to)}"></div>
+      <div id="nightsBox"><label>מספר לילות</label><div class="inline">
+        <span>מ-</span><input type="number" name="min_nights" min="1" max="60" value="${esc(t.min_nights)}">
+        <span>עד</span><input type="number" name="max_nights" min="1" max="60" value="${esc(t.max_nights)}"></div></div>
+      <div><label>עצירות</label><select name="max_stops">
+        <option value="">כל טיסה</option><option value="0">ישירות בלבד</option>
+        <option value="1">עד עצירה אחת</option><option value="2">עד 2 עצירות</option></select></div>
+      <div><label>מחיר יעד לנוסע (רשות)</label><input type="number" name="target_price" min="0" value="${t.target_price ?? ""}">
+        <div class="hint">התראה כשהמחיר יורד לסכום הזה</div></div>
+      <div class="full">
+        <label class="check"><input type="checkbox" name="one_way" ${t.one_way ? "checked" : ""}>כיוון אחד בלבד</label>
+        <label class="check" id="splitBox"><input type="checkbox" name="split_tickets" ${t.split_tickets ? "checked" : ""}>לבדוק גם שני כרטיסי כיוון אחד נפרדים (לפעמים זול יותר, אבל צורך יותר חיפושים)</label>
+      </div>
+    </div>
+    <div class="hint" id="comboHint" style="margin-top:12px"></div>
+    <div class="err" id="formErr"></div>
+    <div class="actions"><button class="btn primary" type="button" id="saveTrip">שמירה</button>
+      <button class="btn" type="button" onclick="editing=null;renderTrips()">ביטול</button></div>
+  </form></div>`;
+}
+
+function readForm() {
+  const f = $("#tripForm");
+  const v = n => f.elements[n].value.trim();
+  editing.name = v("name");
+  editing.origins = v("origins").toUpperCase().split(/[\/, ]+/).filter(Boolean);
+  editing.depart_from = v("depart_from"); editing.depart_to = v("depart_to");
+  editing.min_nights = +v("min_nights") || 0; editing.max_nights = +v("max_nights") || 0;
+  editing.max_stops = v("max_stops") === "" ? null : +v("max_stops");
+  editing.target_price = v("target_price") === "" ? null : +v("target_price");
+  editing.one_way = f.elements.one_way.checked;
+  editing.split_tickets = f.elements.split_tickets.checked && !editing.one_way;
+}
+
+let formUpdate = () => {};
+function bindForm() {
+  const f = $("#tripForm");
+  f.elements.max_stops.value = editing.max_stops ?? "";
+  const update = () => {
+    readForm();
+    $("#nightsBox").style.display = editing.one_way ? "none" : "";
+    $("#splitBox").style.display = editing.one_way ? "none" : "";
+    $("#destChips").innerHTML = editing.destinations.map((d, i) =>
+      `<span class="chip">${esc(cityName(d))} <span class="ltr">${esc(destCodes(d))}</span><button type="button" onclick="removeDest(${i})" title="הסר">×</button></span>`).join("");
+    const c = combos(editing), n = editing.destinations.length;
+    const perMonth = Math.round(state.usage.budget);
+    $("#comboHint").innerHTML = n ? `${c} שילובי תאריכים לכל יעד אפשרי, ${c * n} בסך הכול. במכסה של ${perMonth} חיפושים בחודש, כל השילובים ייבדקו בערך פעם ב-${Math.max(1, Math.ceil(c * n / Math.max(1, perMonth) * 30))} ימים.
+      הבדיקות מתמקדות בתאריכים הזולים שכבר נמצאו, כך שאין צורך לבדוק הכול.` : "";
+  };
+  f.addEventListener("input", update);
+  const add = () => {
+    const raw = $("#destInput").value.toUpperCase().trim();
+    if (!raw) return;
+    const group = raw.split(/[\/, +]+/).filter(Boolean);
+    if (!group.every(c => /^[A-Z]{3}$/.test(c))) { $("#formErr").textContent = `"${raw}" אינו קוד שדה תעופה (3 אותיות באנגלית).`; return; }
+    const key = group.join("/");
+    if (!editing.destinations.some(x => destCodes(x) === key)) editing.destinations.push(key);
+    $("#destInput").value = ""; $("#formErr").textContent = ""; update();
+  };
+  $("#addDest").onclick = add;
+  $("#regionSel").onchange = () => showRegion($("#regionSel").value);
+  $("#destInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+  $("#saveTrip").onclick = saveTrip;
+  formUpdate = update;
+  update();
+}
+
+function showRegion(name) {
+  const r = regionByName(name), box = $("#regionBox");
+  if (!r) { box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="regionbox">
+    <div class="sub" style="margin-bottom:6px">שדות תעופה שמשרתים את ${esc(r.name)} (זמני נסיעה ברכב, בערך):</div>
+    ${r.airports.map(([c, note, on]) => `<label class="ap"><input type="checkbox" value="${c}" ${on ? "checked" : ""}>
+      <b>${esc(AIRPORTS[c] || c)}</b> <span class="ltr">${c}</span><span class="sub">${esc(note)}</span></label>`).join("")}
+    <div style="margin-top:8px">
+      <label class="check"><input type="radio" name="rmode" value="one" checked>חיפוש אחד לכל השדות יחד – מציג את הזול מביניהם (חוסך חיפושים)</label>
+      <label class="check"><input type="radio" name="rmode" value="each">כל שדה כאופציה נפרדת – מחיר לכל שדה (צורך יותר חיפושים)</label>
+    </div>
+    <div class="actions" style="margin-top:8px"><button class="btn primary" type="button" id="addRegion">הוספה</button>
+      <button class="btn" type="button" id="cancelRegion">ביטול</button></div></div>`;
+  $("#cancelRegion").onclick = () => { $("#regionSel").value = ""; box.innerHTML = ""; };
+  $("#addRegion").onclick = () => {
+    const codes = [...box.querySelectorAll("input[type=checkbox]:checked")].map(i => i.value);
+    if (!codes.length) { $("#formErr").textContent = "צריך לסמן לפחות שדה תעופה אחד."; return; }
+    const each = box.querySelector("input[name=rmode]:checked").value === "each";
+    const add = d => { if (!editing.destinations.some(x => destCodes(x) === destCodes(d) || parseDest(x).label && parseDest(x).label === parseDest(d).label)) editing.destinations.push(d); };
+    if (each || codes.length === 1) codes.forEach(c => add(c));
+    else for (let i = 0; i < codes.length; i += MAX_PER_SEARCH) {
+      const part = codes.slice(i, i + MAX_PER_SEARCH);
+      add(`${r.name}${codes.length > MAX_PER_SEARCH ? " " + (i / MAX_PER_SEARCH + 1) : ""}: ${part.join("/")}`);
+    }
+    if (!editing.name) $("#tripForm").elements.name.value = r.name;
+    $("#regionSel").value = ""; box.innerHTML = ""; $("#formErr").textContent = ""; formUpdate();
+  };
+}
+
+function removeDest(i) { editing.destinations.splice(i, 1); formUpdate(); }
+
+function validate(t) {
+  if (!t.name) return "צריך לתת שם לטיול.";
+  if (!t.origins.length || !t.origins.every(c => /^[A-Z]{3}$/.test(c))) return "שדה המוצא צריך להיות קוד של 3 אותיות, למשל TLV.";
+  if (!t.destinations.length) return "צריך להוסיף לפחות יעד אחד.";
+  if (!t.depart_from || !t.depart_to) return "צריך לבחור טווח תאריכי יציאה.";
+  if (t.depart_to < t.depart_from) return "התאריך המאוחר מוקדם מהתאריך המוקדם.";
+  if (!t.one_way && (t.min_nights < 1 || t.max_nights < t.min_nights)) return "טווח הלילות לא תקין.";
+  const others = state.trips.filter((_, i) => i !== editingIndex);
+  if (others.some(o => o.name === t.name)) return "כבר יש טיול בשם הזה.";
+  return null;
+}
+
+async function saveTrips(trips, okMsg) {
+  try { await api("/api/trips", { trips }); toast(okMsg); return true; }
+  catch (e) { toast(e.message); $("#formErr") && ($("#formErr").textContent = e.message); return false; }
+}
+
+async function saveTrip() {
+  const pending = $("#destInput").value.trim();
+  if (pending) $("#addDest").click();
+  readForm();
+  const err = validate(editing);
+  if (err) { $("#formErr").textContent = err; return; }
+  const trips = state.trips.slice();
+  if (editingIndex < 0) trips.push(editing); else trips[editingIndex] = editing;
+  if (await saveTrips(trips, "הטיול נשמר")) { editing = null; await refresh(); }
+}
+async function toggleTrip(i) {
+  const trips = state.trips.slice(); trips[i] = { ...trips[i], enabled: !trips[i].enabled };
+  if (await saveTrips(trips, trips[i].enabled ? "הטיול הופעל" : "הטיול הושהה")) refresh();
+}
+async function deleteTrip(i) {
+  if (!confirm(`למחוק את "${state.trips[i].name}"?`)) return;
+  const trips = state.trips.filter((_, j) => j !== i);
+  if (await saveTrips(trips, "הטיול נמחק")) refresh();
+}
+
+/* ---------- settings ---------- */
+function renderSettings() {
+  const s = state.settings, k = state.keys;
+  const totalCombos = state.trips.filter(t => t.enabled).reduce((a, t) => a + combos(t) * t.destinations.length, 0);
+  const keyField = (name, label, help) => `<div><label>${label}</label>
+    <input name="${name}" type="password" class="ltr" autocomplete="off" placeholder="${k[name] ? "שמור ✓ (להחלפה הדביקי חדש)" : ""}">
+    <div class="hint">${help}</div></div>`;
+  $("#tab-settings").innerHTML = cloudCard() + `<form id="settingsForm" onsubmit="return false">
+  <div class="card"><h2>תדירות ומכסה</h2>
+    <div class="grid" style="margin-top:12px">
+      <div><label>לבדוק כל</label><select name="hours">${HOURS.map(h =>
+        `<option value="${h}" ${h === state.schedule.hours ? "selected" : ""}>${h === 24 ? "יום" : h === 1 ? "שעה" : h + " שעות"}</option>`).join("")}</select>
+        <div class="hint">${state.cloud ? "הבדיקות רצות בענן, גם כשהמחשב כבוי. GitHub מתחיל אותן לפעמים באיחור של כמה דקות."
+          : (state.schedule.supported ? (state.schedule.installed ? "הבדיקה האוטומטית פעילה במחשב." : "הבדיקה האוטומטית עוד לא מוגדרת. היא תוגדר בשמירה.") : "בדיקה אוטומטית זמינה רק ב-Windows.")
+          + " הבדיקה רצה גם כשהמסך הזה סגור, כל עוד המחשב דולק."}</div></div>
+      <div><label>חיפושים בחודש</label><input type="number" name="serpapi_monthly_budget" min="0" value="${s.serpapi_monthly_budget}">
+        <div class="hint">התוכנית החינמית של SerpApi: 250. התוכנית הבסיסית בתשלום: 1,000 ב-25$.</div></div>
+      <div><label>מקסימום חיפושים בבדיקה אחת</label><input type="number" name="max_searches_per_run" min="1" max="50" value="${s.max_searches_per_run}">
+        <div class="hint">חל גם על "בדוק עכשיו"</div></div>
+      <div><label>לא לבדוק שוב את אותם תאריכים לפני (שעות)</label><input type="number" name="min_recheck_hours" min="0" value="${s.min_recheck_hours}"></div>
+    </div>
+    <div class="hint" id="rateHint" style="margin-top:12px"></div>
+  </div>
+  <div class="card"><h2>התראות ומחירים</h2>
+    <div class="grid" style="margin-top:12px">
+      <div><label>מטבע</label><select name="currency">${["USD", "EUR", "ILS", "GBP"].map(c => `<option ${c === s.currency ? "selected" : ""}>${c}</option>`).join("")}</select>
+        <div class="hint">שינוי מטבע לא ממיר מחירים שכבר נשמרו</div></div>
+      <div><label>התראה כשהמחיר לאותם תאריכים יורד ב- (%)</label><input type="number" name="drop_percent" min="1" max="90" value="${s.drop_percent}">
+        <div class="hint">בנוסף מגיעה התראה על כל מחיר נמוך מכל מה שנמצא עד עכשיו</div></div>
+    </div></div>
+  ${WEB ? `<div class="card"><h2>מפתחות</h2><div class="sub">מפתחות (SerpApi, טלגרם) מנוהלים מהמסך שבמחשב, כדי שלא יעברו דרך הדפדפן.</div></div>` : ""}
+  <div class="card" ${WEB ? "hidden" : ""}><h2>מפתחות</h2>
+    <div class="grid" style="margin-top:12px">
+      ${keyField("SERPAPI_KEY", "מפתח SerpApi (חובה)", `<a href="https://serpapi.com/users/sign_up" target="_blank" rel="noopener">הרשמה</a> · <a href="https://serpapi.com/manage-api-key" target="_blank" rel="noopener">איפה המפתח</a>`)}
+      ${keyField("TRAVELPAYOUTS_TOKEN", "טוקן Travelpayouts (רשות)", "מחירים משוערים שעוזרים לבחור אילו תאריכים לבדוק")}
+      ${keyField("TELEGRAM_BOT_TOKEN", "טוקן בוט טלגרם (רשות)", "נוצר אצל ‎@BotFather")}
+      <div><label>Chat ID בטלגרם</label><input name="TELEGRAM_CHAT_ID" class="ltr" placeholder="${k.TELEGRAM_CHAT_ID ? "שמור ✓" : ""}">
+        <div class="hint">אחרי ששלחת הודעה לבוט, הוא מופיע ב-getUpdates. ההוראות ב-README.</div></div>
+    </div>
+    <div class="actions"><button class="btn" type="button" id="testTg" ${k.TELEGRAM_BOT_TOKEN && k.TELEGRAM_CHAT_ID ? "" : "disabled"}>שליחת הודעת בדיקה לטלגרם</button></div>
+  </div>
+  <div class="err" id="setErr"></div>
+  <div class="actions"><button class="btn primary" type="button" id="saveSettings">שמירת ההגדרות</button></div>
+  </form>`;
+  const f = $("#settingsForm");
+  const rate = () => {
+    const h = +f.elements.hours.value, budget = +f.elements.serpapi_monthly_budget.value || 0;
+    const runs = Math.round(24 / h) * 30, per = budget / runs;
+    $("#rateHint").innerHTML = `${runs} בדיקות בחודש, ` + (per >= 1 ? `בערך ${per.toFixed(per < 10 ? 1 : 0)} חיפושים בכל בדיקה.`
+      : `חיפוש אחד בכל ${Math.round(1 / per)} בדיקות בערך (בשאר הבדיקות המכסה נחסכת).`) +
+      (totalCombos ? ` בטיולים הפעילים יש ${totalCombos} שילובי תאריכים בסך הכול.` : "");
+  };
+  f.addEventListener("input", rate); rate();
+  bindCloud();
+  $("#saveSettings").onclick = saveSettings;
+  $("#testTg").onclick = async () => {
+    try { const r = await api("/api/test-notify", {}); toast(r.ok ? "נשלחה הודעה לטלגרם" : r.error); } catch (e) { toast(e.message); }
+  };
+}
+
+/* ---------- cloud ---------- */
+function cloudCard() {
+  const c = state.cloud;
+  if (WEB) {
+    const r = c.last_run;
+    const when = r && r.at ? new Date(r.at).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+    return `<div class="card"><h2>☁ מחובר לענן</h2>
+      <div class="sub">המאגר: <a href="${esc(c.url)}" target="_blank" rel="noopener" class="ltr">${esc(c.repo)}</a>
+        ${r ? ` · בדיקה אחרונה: ${when} ${r.status !== "completed" ? "(רצה עכשיו)" : r.conclusion === "success" ? "✓" : "(נכשלה)"}` : ""}</div>
+      <div class="actions"><button class="btn danger" type="button" id="webForget">ניתוק המכשיר הזה</button></div></div>`;
+  }
+  if (c) {
+    const r = c.last_run;
+    const when = r && r.at ? new Date(r.at).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+    const res = !r ? "עוד לא רצה בדיקה" : r.status !== "completed" ? "רצה עכשיו..." :
+      r.conclusion === "success" ? "הסתיימה בהצלחה" : `נכשלה (${esc(r.conclusion || "")})`;
+    return `<div class="card"><h2>☁ ענן – פועל</h2>
+      <div class="sub">הבדיקות רצות ב-GitHub גם כשהמחשב כבוי. התוצאות נשמרות במאגר
+        <a href="${esc(c.url)}" target="_blank" rel="noopener" class="ltr">${esc(c.repo)}</a>, ושם אפשר לראות אותן גם מהטלפון.</div>
+      <div style="margin-top:8px">בדיקה אחרונה בענן: ${when} · ${res}
+        ${r && r.url ? `· <a href="${esc(r.url)}" target="_blank" rel="noopener">פרטים</a>` : ""}</div>
+      <div class="site">
+        <b>האתר שלך</b> – אותו מסך מכל מקום, גם מהטלפון וגם כשהמחשב כבוי:
+        <div class="actions" style="margin-top:6px">
+          <button class="btn primary" type="button" id="siteOpen">פתיחת האתר</button>
+          <button class="btn" type="button" id="sitePhone">פתיחה בטלפון (קוד QR)</button>
+          <button class="btn" type="button" id="sitePublish">פרסום / עדכון האתר</button></div>
+        <div id="siteQr" class="qr"></div>
+      </div>
+      <div class="actions"><button class="btn" type="button" id="cloudRefresh">רענון מהענן</button>
+        <button class="btn" type="button" id="cloudCode">עדכון הקוד בענן</button>
+        <button class="btn danger" type="button" id="cloudOff">החזרת הבדיקות למחשב</button></div>
+      <div class="hint">מפתח הגישה פג? צרי חדש באותו אופן והדביקי כאן:</div>
+      <div class="inline" style="margin-top:6px"><input id="cloudToken2" type="password" class="ltr" placeholder="github_pat_..." style="max-width:360px">
+        <button class="btn" type="button" id="cloudReconnect">עדכון מפתח</button></div>
+      <div class="err" id="cloudErr"></div></div>`;
+  }
+  return `<div class="card"><h2>☁ בדיקה גם כשהמחשב כבוי</h2>
+    <div class="sub">העברת הבדיקות לענן של GitHub, בחינם. אחרי ההעברה המחשב לא צריך להיות דולק, והתוצאות זמינות גם מהטלפון.</div>
+    <ol style="margin:10px 0 0; padding-inline-start:20px; line-height:1.8">
+      <li>אם אין לך חשבון: <a href="https://github.com/signup" target="_blank" rel="noopener">הרשמה ל-GitHub</a>.</li>
+      <li><a href="https://github.com/new" target="_blank" rel="noopener">יצירת מאגר חדש</a>: בשם <b class="ltr">flightwatch</b>, לבחור <b>Private</b>, ולא לסמן שום דבר נוסף. ללחוץ Create repository.</li>
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">יצירת מפתח גישה</a>:
+        שם <b class="ltr">flightwatch</b>, תוקף הכי ארוך שאפשר. ב-Repository access לבחור <b>Only select repositories</b> ואת flightwatch.
+        ב-Permissions להוסיף ארבע הרשאות ברמת <b>Read and write</b>: <b class="ltr">Actions, Contents, Secrets, Workflows</b>.
+        ללחוץ Generate token ולהעתיק את המפתח.</li>
+      <li>להדביק כאן וללחוץ "העברה לענן":</li>
+    </ol>
+    <div class="grid" style="margin-top:10px">
+      <div><label>המאגר</label><input id="cloudRepo" class="ltr" placeholder="username/flightwatch"></div>
+      <div><label>מפתח הגישה</label><input id="cloudToken" type="password" class="ltr" placeholder="github_pat_..."></div>
+    </div>
+    <div class="actions"><button class="btn primary" type="button" id="cloudConnect">העברה לענן</button></div>
+    <div class="err" id="cloudErr"></div><pre id="cloudLog" hidden></pre></div>`;
+}
+
+function loadQrLib() {
+  return window.QRCode ? Promise.resolve() : new Promise((ok, bad) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    sc.onload = ok; sc.onerror = () => bad(new Error("לא הצלחתי לטעון את יוצר קוד ה-QR"));
+    document.head.appendChild(sc);
+  });
+}
+
+function bindCloud() {
+  if (WEB) {
+    $("#webForget").onclick = () => { if (confirm("לנתק את המכשיר הזה? יהיה צריך להתחבר שוב.")) { web.forget(); refresh(); } };
+    return;
+  }
+  const err = m => { $("#cloudErr").textContent = m || ""; };
+  if ($("#siteOpen")) {
+    $("#siteOpen").onclick = async () => {
+      try { const r = await api("/api/cloud/device-link", {}); window.open(r.link, "_blank"); } catch (e) { err(e.message); }
+    };
+    $("#sitePhone").onclick = async () => {
+      try {
+        const r = await api("/api/cloud/device-link", {}); await loadQrLib();
+        const box = $("#siteQr"); box.innerHTML = "";
+        new QRCode(box, { text: r.link, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.L });
+        box.insertAdjacentHTML("beforeend", `<div class="hint">סורקים במצלמה של הטלפון. הקוד כולל את מפתח הגישה, אז לא לשתף אותו.
+          אפשר להוסיף את האתר למסך הבית של הטלפון.</div>`);
+      } catch (e) { err(e.message); }
+    };
+    $("#sitePublish").onclick = async e => {
+      e.target.disabled = true;
+      try { const r = await api("/api/cloud/publish-site", {}); toast("האתר עודכן"); err(""); }
+      catch (x) { err(x.message); }
+      e.target.disabled = false;
+    };
+  }
+  const connect = async (repo, token, btn) => {
+    if (!repo || !token) { err("צריך למלא את שם המאגר ואת מפתח הגישה."); return; }
+    btn.disabled = true; btn.textContent = "מעביר... (עד דקה)"; err("");
+    try {
+      const r = await api("/api/cloud/connect", { repo, token });
+      toast("הבדיקות עברו לענן");
+      if (r.warnings && r.warnings.length) alert("שימי לב:\n" + r.warnings.join("\n"));
+      $("#tab-settings").innerHTML = ""; await refresh();
+    } catch (e) { err(e.message); btn.disabled = false; btn.textContent = "נסי שוב"; }
+  };
+  if ($("#cloudConnect")) $("#cloudConnect").onclick = e => connect($("#cloudRepo").value.trim(), $("#cloudToken").value.trim(), e.target);
+  if ($("#cloudReconnect")) $("#cloudReconnect").onclick = e => connect(state.cloud.repo, $("#cloudToken2").value.trim(), e.target);
+  if ($("#cloudRefresh")) $("#cloudRefresh").onclick = async () => { await api("/api/cloud/refresh", {}); $("#tab-settings").innerHTML = ""; refresh(); toast("עודכן מהענן"); };
+  if ($("#cloudCode")) $("#cloudCode").onclick = async e => {
+    e.target.disabled = true;
+    try { const r = await api("/api/cloud/update-code", {}); toast(r.uploaded ? `עודכנו ${r.uploaded} קבצים בענן` : "הקוד בענן כבר מעודכן"); }
+    catch (x) { err(x.message); }
+    e.target.disabled = false;
+  };
+  if ($("#cloudOff")) $("#cloudOff").onclick = async () => {
+    if (!confirm("להחזיר את הבדיקות למחשב? הבדיקות בענן ייעצרו, והמחשב יצטרך להיות דולק כדי לבדוק.")) return;
+    await api("/api/cloud/disconnect", {}); toast("הבדיקות חזרו למחשב"); $("#tab-settings").innerHTML = ""; refresh();
+  };
+}
+
+async function saveSettings() {
+  const f = $("#settingsForm"), v = n => f.elements[n].value.trim();
+  const settings = {
+    runs_per_day: Math.round(24 / +v("hours")), serpapi_monthly_budget: +v("serpapi_monthly_budget"),
+    max_searches_per_run: +v("max_searches_per_run"), min_recheck_hours: +v("min_recheck_hours"),
+    currency: v("currency"), drop_percent: +v("drop_percent"),
+  };
+  const keys = {};
+  for (const n of ["SERPAPI_KEY", "TRAVELPAYOUTS_TOKEN", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]) if (v(n)) keys[n] = v(n);
+  try {
+    const r = await api("/api/settings", { settings, keys });
+    $("#setErr").textContent = r.warning ? "ההגדרות נשמרו, אבל הבדיקה האוטומטית לא הוגדרה: " + r.warning : "";
+    toast("ההגדרות נשמרו"); $("#tab-settings").innerHTML = ""; refresh();
+  } catch (e) { $("#setErr").textContent = e.message; }
+}
+
+async function setAuto(enabled) {
+  try {
+    const r = await api("/api/auto", { enabled });
+    toast(enabled ? "הבדיקה האוטומטית הופעלה" : "הבדיקה האוטומטית הושהתה");
+    if (r.warning) showProblem("השינוי נשמר, אבל Windows לא אישר את השינוי בתזמון: " + esc(r.warning));
+    await refresh();
+  } catch (e) { toast(e.message); }
+}
+
+async function installSchedule() {
+  try { const r = await api("/api/schedule", {}); toast(r.ok ? "הבדיקה האוטומטית הופעלה" : r.error); refresh(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- tabs & boot ---------- */
+let tab = "results";
+function showTab(name) {
+  tab = name;
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  for (const t of ["results", "trips", "settings"]) $("#tab-" + t).hidden = t !== name;
+  if (name !== "settings") $("#tab-settings").innerHTML = "";
+  if (name === "trips" && state) renderTrips();
+  render();
+}
+function render() {
+  if (!state) return;
+  renderHeader(); renderBanners();
+  if (tab === "results") renderResults();
+  // Forms are not redrawn by the background refresh, so typing is never lost.
+  if (tab === "trips" && !editing) renderTrips();
+  if (tab === "settings" && !$("#settingsForm")) renderSettings();
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+$("#checkBtn").onclick = async () => {
+  try { const r = await api("/api/check", {}); toast(r.ok ? "הבדיקה התחילה" : "כבר רצה בדיקה"); showTab("results"); refresh(); }
+  catch (e) { toast(e.message); }
+};
+if (WEB) document.title = "flightwatch";
+$("#airports").innerHTML = Object.entries(AIRPORTS).map(([c, n]) => `<option value="${c}">${n}</option>`).join("");
+refresh();
+</script>
+</body>
+</html>
