@@ -64,6 +64,13 @@
   .best { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--good-bg); color: var(--good); margin-top: 3px; }
   .site { margin-top: 12px; padding: 12px; border-radius: 8px; background: #eef4fe; }
   .qr { margin-top: 10px; } .qr img, .qr canvas { background: #fff; padding: 8px; border-radius: 8px; }
+  .destsearch { position: relative; max-width: 420px; }
+  .suggest { position: absolute; z-index: 20; inset-inline: 0; top: calc(100% + 4px); background: var(--card);
+             border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); overflow: hidden; }
+  .suggest button { display: block; width: 100%; text-align: start; background: none; border: 0; border-top: 1px solid var(--line);
+                    padding: 10px 12px; font: inherit; color: var(--ink); cursor: pointer; }
+  .suggest button:first-child { border-top: 0; }
+  .suggest button:hover, .suggest button:focus { background: #eef4fe; }
   .land { font-size: 12px; color: var(--good); }
   .regionbox { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 8px; background: #fafbfc; }
   .regionbox .ap { display: flex; align-items: center; gap: 4px; font-size: 14px; padding: 2px 0; }
@@ -100,6 +107,7 @@
   @media (max-width: 760px) {
     .dest { grid-template-columns: 1fr 1fr; }
     .dest .detail { grid-column: 1 / -1; }
+    .trip-row { flex-wrap: wrap; } .trip-row .grow { flex-basis: 100%; }
     .bar { padding: 10px 14px; gap: 10px; } main { padding: 14px; }
     .dest .spark-wrap { display: none; }
   }
@@ -150,50 +158,82 @@ const AIRPORTS = {
   GRZ: "גראץ", LNZ: "לינץ", KLU: "קלגנפורט", MMG: "ממינגן", FDH: "פרידריכסהאפן", BZO: "בולצאנו",
   VRN: "ורונה", TRS: "טריאסטה", TAT: "פופרד", NRN: "ויזה (דיסלדורף)", BVA: "פריז בובה", LCY: "לונדון סיטי",
   BRQ: "ברנו", DRS: "דרזדן", ZAD: "זאדאר", PUY: "פולה", RJK: "ריאקה", KUT: "קוטאיסי", GRO: "חירונה",
-  REU: "ריאוס", FAO: "פארו", TGD: "פודגוריצה", BKK: "בנגקוק", HKT: "פוקט", JFK: "ניו יורק", EWR: "ניו יורק ניוארק", MIA: "מיאמי", LAX: "לוס אנג'לס",
+  REU: "ריאוס", FAO: "פארו", TGD: "פודגוריצה", TRN: "טורינו", GOA: "גנואה", BRI: "בארי", BDS: "ברינדיזי",
+  OLB: "אולביה (סרדיניה)", CAG: "קליארי (סרדיניה)", SUF: "למציה", AOI: "אנקונה", TRS: "טריאסטה", BKK: "בנגקוק", HKT: "פוקט", JFK: "ניו יורק", EWR: "ניו יורק ניוארק", MIA: "מיאמי", LAX: "לוס אנג'לס",
 };
 
 /* Regions: airports that serve an area, with rough drive time by car. [code, note, on by default] */
 const REGIONS = [
-  { name: "טירול", airports: [["INN", "בלב טירול", 1], ["MUC", "כ-2 שעות לאינסברוק", 1], ["SZG", "כ-2 שעות לאינסברוק", 1],
+  { country: "אוסטריה", name: "טירול", airports: [["INN", "בלב טירול", 1], ["MUC", "כ-2 שעות לאינסברוק", 1], ["SZG", "כ-2 שעות לאינסברוק", 1],
       ["MMG", "כ-2.5 שעות לאינסברוק", 1], ["VRN", "כ-3 שעות לאינסברוק", 0], ["ZRH", "כ-3.5 שעות לאינסברוק", 0]] },
-  { name: "אוסטריה (כל המדינה)", airports: [["VIE", "וינה", 1], ["SZG", "זלצבורג", 1], ["INN", "טירול", 1], ["GRZ", "גראץ", 1],
+  { country: "אוסטריה", name: "אוסטריה (כל המדינה)", airports: [["VIE", "וינה", 1], ["SZG", "זלצבורג", 1], ["INN", "טירול", 1], ["GRZ", "גראץ", 1],
       ["LNZ", "לינץ", 0], ["KLU", "קרינתיה", 0], ["BTS", "כשעה לווינה", 1], ["MUC", "כ-1.5 שעות לזלצבורג", 1]] },
-  { name: "זלצבורג והאגמים", airports: [["SZG", "בזלצבורג", 1], ["MUC", "כ-1.5 שעות לזלצבורג", 1], ["LNZ", "כ-1.5 שעות לזלצבורג", 1],
+  { country: "אוסטריה", name: "זלצבורג והאגמים", airports: [["SZG", "בזלצבורג", 1], ["MUC", "כ-1.5 שעות לזלצבורג", 1], ["LNZ", "כ-1.5 שעות לזלצבורג", 1],
       ["VIE", "כ-3 שעות לזלצבורג", 0], ["INN", "כ-2 שעות לזלצבורג", 0]] },
-  { name: "וינה והסביבה", airports: [["VIE", "בווינה", 1], ["BTS", "כשעה לווינה", 1], ["BUD", "כ-2.5 שעות לווינה", 0]] },
-  { name: "בוואריה", airports: [["MUC", "מינכן", 1], ["MMG", "כ-1.5 שעות למינכן", 1], ["NUE", "כ-1.5 שעות למינכן", 1],
-      ["SZG", "כ-1.5 שעות למינכן", 1], ["STR", "כ-2.5 שעות למינכן", 0]] },
-  { name: "שווייץ", airports: [["ZRH", "ציריך", 1], ["GVA", "ז'נבה", 1], ["BSL", "באזל", 1], ["MXP", "כשעה ללוגאנו", 0], ["FDH", "כ-1.5 שעות לציריך", 0]] },
-  { name: "דולומיטים", airports: [["VRN", "כ-2 שעות לבולצאנו", 1], ["INN", "כ-1.5 שעות לבולצאנו", 1], ["VCE", "כ-3 שעות לדולומיטים", 1],
-      ["TSF", "כ-2.5 שעות לדולומיטים", 1], ["BGY", "כ-3 שעות לבולצאנו", 0], ["MUC", "כ-3.5 שעות לבולצאנו", 0]] },
-  { name: "אגם גארדה", airports: [["VRN", "כחצי שעה לאגם", 1], ["BGY", "כשעה לאגם", 1], ["LIN", "כ-1.5 שעות לאגם", 1],
+  { country: "אוסטריה", name: "וינה והסביבה", airports: [["VIE", "בווינה", 1], ["BTS", "כשעה לווינה", 1], ["BUD", "כ-2.5 שעות לווינה", 0]] },
+  { country: "איטליה", name: "צפון איטליה", airports: [["MXP", "מילאנו מלפנסה", 1], ["BGY", "מילאנו ברגמו", 1], ["LIN", "מילאנו לינאטה", 1],
+      ["VCE", "ונציה", 1], ["TSF", "ונציה טרוויזו", 1], ["VRN", "ורונה (אגם גארדה)", 1], ["BLQ", "בולוניה", 1],
+      ["TRN", "טורינו", 0], ["GOA", "גנואה", 0], ["TRS", "טריאסטה", 0]] },
+  { country: "איטליה", name: "אגם גארדה", airports: [["VRN", "כחצי שעה לאגם", 1], ["BGY", "כשעה לאגם", 1], ["LIN", "כ-1.5 שעות לאגם", 1],
       ["VCE", "כ-1.5-2 שעות לאגם", 1], ["MXP", "כ-2 שעות לאגם", 0], ["BLQ", "כ-1.5 שעות לאגם", 0]] },
-  { name: "הולנד", airports: [["AMS", "אמסטרדם", 1], ["EIN", "כ-1.5 שעות לאמסטרדם", 1], ["RTM", "כשעה לאמסטרדם", 1],
+  { country: "איטליה", name: "דולומיטים", airports: [["VRN", "כ-2 שעות לבולצאנו", 1], ["INN", "כ-1.5 שעות לבולצאנו", 1], ["VCE", "כ-3 שעות לדולומיטים", 1],
+      ["TSF", "כ-2.5 שעות לדולומיטים", 1], ["BGY", "כ-3 שעות לבולצאנו", 0], ["MUC", "כ-3.5 שעות לבולצאנו", 0]] },
+  { country: "איטליה", name: "מילאנו", airports: [["MXP", "מלפנסה", 1], ["BGY", "ברגמו", 1], ["LIN", "לינאטה", 1]] },
+  { country: "איטליה", name: "ונציה", airports: [["VCE", "מרקו פולו", 1], ["TSF", "טרוויזו", 1], ["VRN", "כ-1.5 שעות לוונציה", 0]] },
+  { country: "איטליה", name: "טוסקנה", airports: [["FLR", "פירנצה", 1], ["PSA", "פיזה (כשעה לפירנצה)", 1], ["BLQ", "בולוניה (כ-1.5 שעות לפירנצה)", 1]] },
+  { country: "איטליה", name: "רומא", airports: [["FCO", "פיומיצ'ינו", 1], ["CIA", "צ'אמפינו", 1]] },
+  { country: "איטליה", name: "נאפולי ואמלפי", airports: [["NAP", "נאפולי", 1], ["FCO", "כ-2.5 שעות לנאפולי", 0]] },
+  { country: "איטליה", name: "סיציליה", airports: [["CTA", "קטניה", 1], ["PMO", "פלרמו", 1]] },
+  { country: "איטליה", name: "סרדיניה", airports: [["OLB", "אולביה", 1], ["CAG", "קליארי", 1]] },
+  { country: "גרמניה ושווייץ", name: "בוואריה", airports: [["MUC", "מינכן", 1], ["MMG", "כ-1.5 שעות למינכן", 1], ["NUE", "כ-1.5 שעות למינכן", 1],
+      ["SZG", "כ-1.5 שעות למינכן", 1], ["STR", "כ-2.5 שעות למינכן", 0]] },
+  { country: "גרמניה ושווייץ", name: "שווייץ", airports: [["ZRH", "ציריך", 1], ["GVA", "ז'נבה", 1], ["BSL", "באזל", 1], ["MXP", "כשעה ללוגאנו", 0], ["FDH", "כ-1.5 שעות לציריך", 0]] },
+  { country: "מערב אירופה", name: "הולנד", airports: [["AMS", "אמסטרדם", 1], ["EIN", "כ-1.5 שעות לאמסטרדם", 1], ["RTM", "כשעה לאמסטרדם", 1],
       ["BRU", "כ-2.5 שעות לאמסטרדם", 1], ["CRL", "כ-3 שעות לאמסטרדם", 0], ["DUS", "כ-2.5 שעות לאמסטרדם", 1], ["NRN", "כ-2 שעות לאמסטרדם", 0]] },
-  { name: "קרקוב וזקופנה", airports: [["KRK", "קרקוב (כשעתיים לזקופנה)", 1], ["KTW", "כ-1.25 שעות לקרקוב", 1],
+  { country: "מערב אירופה", name: "פריז", airports: [["CDG", "שארל דה גול", 1], ["ORY", "אורלי", 1], ["BVA", "בובה (כ-1.5 שעות לפריז)", 0]] },
+  { country: "מערב אירופה", name: "לונדון", airports: [["LHR", "הית'רו", 1], ["LGW", "גטוויק", 1], ["STN", "סטנסטד", 1], ["LTN", "לוטון", 1], ["LCY", "לונדון סיטי", 0]] },
+  { country: "מערב אירופה", name: "ברצלונה וקוסטה ברווה", airports: [["BCN", "ברצלונה", 1], ["GRO", "כ-1.25 שעות לברצלונה", 1], ["REU", "כ-1.5 שעות לברצלונה", 0]] },
+  { country: "מערב אירופה", name: "פורטוגל", airports: [["LIS", "ליסבון", 1], ["OPO", "פורטו", 1], ["FAO", "אלגרבה", 1]] },
+  { country: "מרכז ומזרח אירופה", name: "קרקוב וזקופנה", airports: [["KRK", "קרקוב (כשעתיים לזקופנה)", 1], ["KTW", "כ-1.25 שעות לקרקוב", 1],
       ["TAT", "כ-1.5 שעות לזקופנה", 0], ["WAW", "כ-3.5 שעות לקרקוב", 0]] },
-  { name: "סלובקיה והטטרה", airports: [["TAT", "פופרד, למרגלות הטטרה", 1], ["KSC", "כ-1.5 שעות לטטרה", 1], ["KRK", "כ-2.5 שעות לטטרה", 1],
+  { country: "מרכז ומזרח אירופה", name: "סלובקיה והטטרה", airports: [["TAT", "פופרד, למרגלות הטטרה", 1], ["KSC", "כ-1.5 שעות לטטרה", 1], ["KRK", "כ-2.5 שעות לטטרה", 1],
       ["KTW", "כ-3 שעות לטטרה", 0], ["BTS", "כ-4 שעות לטטרה", 1], ["BUD", "כ-4 שעות לטטרה", 0], ["VIE", "כ-4.5 שעות לטטרה", 0]] },
-  { name: "פראג", airports: [["PRG", "פראג", 1], ["DRS", "כ-2 שעות לפראג", 0], ["BRQ", "כ-2.5 שעות לפראג", 0], ["VIE", "כ-4 שעות לפראג", 0]] },
-  { name: "בודפשט", airports: [["BUD", "בודפשט", 1], ["BTS", "כ-2 שעות לבודפשט", 1], ["VIE", "כ-2.5 שעות לבודפשט", 1]] },
-  { name: "סלובניה", airports: [["LJU", "ליובליאנה", 1], ["TRS", "כשעה לליובליאנה", 1], ["KLU", "כשעה לליובליאנה", 1],
+  { country: "מרכז ומזרח אירופה", name: "פראג", airports: [["PRG", "פראג", 1], ["DRS", "כ-2 שעות לפראג", 0], ["BRQ", "כ-2.5 שעות לפראג", 0], ["VIE", "כ-4 שעות לפראג", 0]] },
+  { country: "מרכז ומזרח אירופה", name: "בודפשט", airports: [["BUD", "בודפשט", 1], ["BTS", "כ-2 שעות לבודפשט", 1], ["VIE", "כ-2.5 שעות לבודפשט", 1]] },
+  { country: "הבלקן", name: "סלובניה", airports: [["LJU", "ליובליאנה", 1], ["TRS", "כשעה לליובליאנה", 1], ["KLU", "כשעה לליובליאנה", 1],
       ["ZAG", "כ-1.5 שעות לליובליאנה", 1], ["VCE", "כ-2.5 שעות לליובליאנה", 1], ["GRZ", "כ-2 שעות לליובליאנה", 0]] },
-  { name: "קרואטיה – איסטריה", airports: [["PUY", "פולה", 1], ["RJK", "ריאקה", 1], ["TRS", "כ-1.5 שעות לאיסטריה", 1],
+  { country: "הבלקן", name: "קרואטיה – איסטריה", airports: [["PUY", "פולה", 1], ["RJK", "ריאקה", 1], ["TRS", "כ-1.5 שעות לאיסטריה", 1],
       ["LJU", "כ-2 שעות לאיסטריה", 1], ["VCE", "כ-3 שעות לאיסטריה", 0], ["ZAG", "כ-2.5 שעות לאיסטריה", 0]] },
-  { name: "קרואטיה – דלמטיה", airports: [["SPU", "ספליט", 1], ["DBV", "דוברובניק", 1], ["ZAD", "זאדאר", 1]] },
-  { name: "רומא", airports: [["FCO", "פיומיצ'ינו", 1], ["CIA", "צ'אמפינו", 1]] },
-  { name: "מילאנו", airports: [["MXP", "מלפנסה", 1], ["BGY", "ברגמו", 1], ["LIN", "לינאטה", 1]] },
-  { name: "ונציה", airports: [["VCE", "מרקו פולו", 1], ["TSF", "טרוויזו", 1], ["VRN", "כ-1.5 שעות לוונציה", 0]] },
-  { name: "פריז", airports: [["CDG", "שארל דה גול", 1], ["ORY", "אורלי", 1], ["BVA", "בובה (כ-1.5 שעות לפריז)", 0]] },
-  { name: "לונדון", airports: [["LHR", "הית'רו", 1], ["LGW", "גטוויק", 1], ["STN", "סטנסטד", 1], ["LTN", "לוטון", 1], ["LCY", "לונדון סיטי", 0]] },
-  { name: "ברצלונה וקוסטה ברווה", airports: [["BCN", "ברצלונה", 1], ["GRO", "כ-1.25 שעות לברצלונה", 1], ["REU", "כ-1.5 שעות לברצלונה", 0]] },
-  { name: "פורטוגל", airports: [["LIS", "ליסבון", 1], ["OPO", "פורטו", 1], ["FAO", "אלגרבה", 1]] },
-  { name: "כרתים", airports: [["HER", "הרקליון", 1], ["CHQ", "חאניה", 1]] },
-  { name: "קפריסין", airports: [["LCA", "לרנקה", 1], ["PFO", "פאפוס", 1]] },
-  { name: "גאורגיה", airports: [["TBS", "טביליסי", 1], ["KUT", "קוטאיסי (כ-3 שעות לטביליסי)", 1], ["BUS", "בטומי", 1]] },
-  { name: "מונטנגרו", airports: [["TGD", "פודגוריצה", 1], ["TIV", "טיבאט", 1], ["DBV", "כשעה לקוטור", 1]] },
+  { country: "הבלקן", name: "קרואטיה – דלמטיה", airports: [["SPU", "ספליט", 1], ["DBV", "דוברובניק", 1], ["ZAD", "זאדאר", 1]] },
+  { country: "הבלקן", name: "מונטנגרו", airports: [["TGD", "פודגוריצה", 1], ["TIV", "טיבאט", 1], ["DBV", "כשעה לקוטור", 1]] },
+  { country: "יוון, קפריסין ועוד", name: "כרתים", airports: [["HER", "הרקליון", 1], ["CHQ", "חאניה", 1]] },
+  { country: "יוון, קפריסין ועוד", name: "קפריסין", airports: [["LCA", "לרנקה", 1], ["PFO", "פאפוס", 1]] },
+  { country: "יוון, קפריסין ועוד", name: "גאורגיה", airports: [["TBS", "טביליסי", 1], ["KUT", "קוטאיסי (כ-3 שעות לטביליסי)", 1], ["BUS", "בטומי", 1]] },
 ];
+const EN = {   // English names, so searching in English works too
+  TLV: "tel aviv", VIE: "vienna", INN: "innsbruck", SZG: "salzburg", MUC: "munich", AMS: "amsterdam", EIN: "eindhoven",
+  RTM: "rotterdam", BRU: "brussels", KRK: "krakow", WAW: "warsaw", KTW: "katowice", BTS: "bratislava", KSC: "kosice",
+  BUD: "budapest", PRG: "prague", ATH: "athens", SKG: "thessaloniki", RHO: "rhodes", HER: "heraklion crete", CHQ: "chania crete",
+  LCA: "larnaca cyprus", PFO: "paphos cyprus", FCO: "rome fiumicino", CIA: "rome ciampino", MXP: "milan malpensa",
+  BGY: "milan bergamo", LIN: "milan linate", VCE: "venice", TSF: "venice treviso", NAP: "naples", BLQ: "bologna",
+  PSA: "pisa", FLR: "florence", CTA: "catania sicily", PMO: "palermo sicily", BCN: "barcelona", MAD: "madrid",
+  LIS: "lisbon", OPO: "porto", CDG: "paris", ORY: "paris orly", NCE: "nice", LHR: "london heathrow", LGW: "london gatwick",
+  STN: "london stansted", LTN: "london luton", BER: "berlin", FRA: "frankfurt", ZRH: "zurich", GVA: "geneva",
+  LJU: "ljubljana", ZAG: "zagreb", DBV: "dubrovnik", SPU: "split", TBS: "tbilisi", BUS: "batumi", IST: "istanbul",
+  VRN: "verona", TRN: "turin", GOA: "genoa", BRI: "bari", OLB: "olbia sardinia", CAG: "cagliari sardinia",
+  GRZ: "graz", LNZ: "linz", KLU: "klagenfurt", MMG: "memmingen", TAT: "poprad tatras", DXB: "dubai", BKK: "bangkok",
+};
+const REGION_EN = {
+  "טירול": "tyrol tirol innsbruck", "אוסטריה (כל המדינה)": "austria", "זלצבורג והאגמים": "salzburg lakes",
+  "וינה והסביבה": "vienna", "צפון איטליה": "north italy northern italy", "אגם גארדה": "lake garda",
+  "דולומיטים": "dolomites", "מילאנו": "milan", "ונציה": "venice", "טוסקנה": "tuscany florence",
+  "רומא": "rome", "נאפולי ואמלפי": "naples amalfi", "סיציליה": "sicily", "סרדיניה": "sardinia",
+  "בוואריה": "bavaria munich", "שווייץ": "switzerland", "הולנד": "netherlands holland amsterdam",
+  "פריז": "paris", "לונדון": "london", "ברצלונה וקוסטה ברווה": "barcelona costa brava", "פורטוגל": "portugal",
+  "קרקוב וזקופנה": "krakow zakopane", "סלובקיה והטטרה": "slovakia tatras", "פראג": "prague", "בודפשט": "budapest",
+  "סלובניה": "slovenia", "קרואטיה – איסטריה": "croatia istria", "קרואטיה – דלמטיה": "croatia dalmatia",
+  "מונטנגרו": "montenegro", "כרתים": "crete", "קפריסין": "cyprus", "גאורגיה": "georgia",
+};
 const MAX_PER_SEARCH = 7;
 const regionByName = name => REGIONS.find(r => r.name === name);
 const parseDest = s => { const i = s.indexOf(":"); return i < 0 ? { label: "", codes: s.split("/") } : { label: s.slice(0, i).trim(), codes: s.slice(i + 1).trim().split("/") }; };
@@ -640,12 +680,14 @@ function tripForm() {
       <div><label>יוצאים מ-</label><input name="origins" class="ltr" list="airports" value="${esc(t.origins.join("/"))}">
         <div class="hint">קוד שדה תעופה, למשל TLV</div></div>
       <div class="full"><label>יעדים אפשריים (לכל אחד יוצג מחיר, כדי שתוכלי להשוות ולבחור)</label>
-        <div class="inline"><input id="destInput" class="ltr" list="airports" placeholder="VIE" style="max-width:220px">
-          <button class="btn" type="button" id="addDest">הוסף יעד</button></div>
-        <div class="hint">אפשר לכתוב קוד או לבחור מהרשימה. לחיפוש משותף בכמה שדות של אותה עיר כותבים FCO/CIA.</div>
-        <div class="inline" style="margin-top:8px"><span class="sub">או לפי אזור:</span>
-          <select id="regionSel" style="max-width:260px"><option value="">בחירת אזור...</option>
-            ${REGIONS.map(r => `<option>${esc(r.name)}</option>`).join("")}</select></div>
+        <div class="destsearch"><input id="destInput" autocomplete="off" enterkeyhint="search"
+            placeholder="מחפשים עיר או אזור: רומא, מילאנו, טירול..." style="max-width:420px">
+          <div id="destSuggest" class="suggest" hidden></div></div>
+        <div class="hint">אפשר לכתוב בעברית, באנגלית או קוד של שדה תעופה (כמו FCO).</div>
+        <div class="inline" style="margin-top:8px"><span class="sub">או לבחור אזור מהרשימה:</span>
+          <select id="regionSel" style="max-width:280px"><option value="">בחירת אזור...</option>
+            ${[...new Set(REGIONS.map(r => r.country))].map(c => `<optgroup label="${esc(c)}">${
+              REGIONS.filter(r => r.country === c).map(r => `<option>${esc(r.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
         <div id="regionBox"></div>
         <div class="chips" id="destChips"></div></div>
       <div><label>יציאה – התאריך המוקדם ביותר</label><input type="date" name="depart_from" value="${esc(t.depart_from)}"></div>
@@ -699,18 +741,36 @@ function bindForm() {
       הבדיקות מתמקדות בתאריכים הזולים שכבר נמצאו, כך שאין צורך לבדוק הכול.` : "";
   };
   f.addEventListener("input", update);
-  const add = () => {
-    const raw = $("#destInput").value.toUpperCase().trim();
-    if (!raw) return;
-    const group = raw.split(/[\/, +]+/).filter(Boolean);
-    if (!group.every(c => /^[A-Z]{3}$/.test(c))) { $("#formErr").textContent = `"${raw}" אינו קוד שדה תעופה (3 אותיות באנגלית).`; return; }
-    const key = group.join("/");
+  const input = $("#destInput"), box = $("#destSuggest");
+  const addCodes = key => {
     if (!editing.destinations.some(x => destCodes(x) === key)) editing.destinations.push(key);
-    $("#destInput").value = ""; $("#formErr").textContent = ""; update();
+    input.value = ""; box.hidden = true; $("#formErr").textContent = ""; update();
   };
-  $("#addDest").onclick = add;
+  const pick = item => {
+    if (item.region) { input.value = ""; box.hidden = true; $("#regionSel").value = item.region; showRegion(item.region); }
+    else addCodes(item.code);
+  };
+  let items = [];
+  const suggest = () => {
+    items = searchDest(input.value);
+    box.hidden = !items.length;
+    box.innerHTML = items.map((it, i) => `<button type="button" data-i="${i}">${it.region
+      ? `<b>${esc(it.region)}</b> <span class="sub">אזור · ${esc(it.detail)}</span>`
+      : `<b>${esc(it.name)}</b> <span class="sub ltr">${esc(it.code)}</span>`}</button>`).join("");
+    box.querySelectorAll("button").forEach(b => b.onclick = () => pick(items[+b.dataset.i]));
+  };
+  input.addEventListener("input", e => { e.stopPropagation(); suggest(); });
+  input.addEventListener("focus", suggest);
+  input.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const raw = input.value.toUpperCase().trim();
+    const codes = raw.split(/[\/, +]+/).filter(Boolean);
+    if (codes.length && codes.every(c => /^[A-Z]{3}$/.test(c)) && (codes.length > 1 || AIRPORTS[raw] || !items.length)) addCodes(codes.join("/"));
+    else if (items.length) pick(items[0]);
+  });
+  document.addEventListener("click", e => { if (!e.target.closest(".destsearch")) box.hidden = true; });
   $("#regionSel").onchange = () => showRegion($("#regionSel").value);
-  $("#destInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); add(); } });
   $("#saveTrip").onclick = saveTrip;
   formUpdate = update;
   update();
@@ -745,6 +805,23 @@ function showRegion(name) {
   };
 }
 
+function norm(t) { return String(t || "").toLowerCase().replace(/['"׳״\-–()]/g, "").trim(); }
+function searchDest(q) {
+  const n = norm(q);
+  if (!n) return [];
+  const up = q.trim().toUpperCase(), out = [];
+  for (const r of REGIONS)
+    if (norm(r.name).includes(n) || norm(REGION_EN[r.name]).includes(n) || r.airports.some(a => a[0] === up))
+      out.push({ region: r.name, detail: r.airports.filter(a => a[2]).map(a => AIRPORTS[a[0]] || a[0]).filter((v, i, x) => x.indexOf(v) === i).slice(0, 3).join(", ") });
+  for (const [code, name] of Object.entries(AIRPORTS)) {
+    if (code === "TLV" || code === "ETM") continue;
+    if (code === up || code.startsWith(up) && up.length >= 2 || norm(name).includes(n) || norm(EN[code]).includes(n))
+      out.push({ code, name });
+  }
+  out.sort((a, b) => (b.code === up) - (a.code === up));
+  return out.slice(0, 8);
+}
+
 function removeDest(i) { editing.destinations.splice(i, 1); formUpdate(); }
 
 function validate(t) {
@@ -766,7 +843,11 @@ async function saveTrips(trips, okMsg) {
 
 async function saveTrip() {
   const pending = $("#destInput").value.trim();
-  if (pending) $("#addDest").click();
+  if (pending) {
+    const first = searchDest(pending)[0];
+    if (first && !first.region) { if (!editing.destinations.some(x => destCodes(x) === first.code)) editing.destinations.push(first.code); }
+    $("#destInput").value = "";
+  }
   readForm();
   const err = validate(editing);
   if (err) { $("#formErr").textContent = err; return; }
