@@ -71,6 +71,7 @@
                     padding: 10px 12px; font: inherit; color: var(--ink); cursor: pointer; }
   .suggest button:first-child { border-top: 0; }
   .suggest button:hover, .suggest button:focus { background: #eef4fe; }
+  button.small { font-size: 12px; padding: 5px 10px; margin-top: 6px; white-space: nowrap; }
   .land { font-size: 12px; color: var(--good); }
   .regionbox { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 8px; background: #fafbfc; }
   .regionbox .ap { display: flex; align-items: center; gap: 4px; font-size: 14px; padding: 2px 0; }
@@ -419,7 +420,8 @@ async function webState() {
     return { trip: t.name, enabled: t.enabled, destinations: t.destinations.map(dest => {
       const d = parseDest(dest), name = d.label || d.codes.join("/");
       const found = prev && prev.destinations.find(x => x.destination === name);
-      return found || { destination: name, label: d.label, airports: d.codes, options: [], trend: [],
+      return found || { watch: t.destinations.length === 1 ? t.name : `${t.name} · ${name}`,
+                        destination: name, label: d.label, airports: d.codes, options: [], trend: [],
                         checked: 0, total: combos(t), hint_price: null };
     }) };
   });
@@ -456,7 +458,8 @@ async function webApi(path, body) {
   }
   if (path === "/api/check") {
     const info = await web.gh("GET", "");
-    await web.gh("POST", "/actions/workflows/flightwatch.yml/dispatches", { ref: info.default_branch || "main" });
+    await web.gh("POST", "/actions/workflows/flightwatch.yml/dispatches",
+      { ref: info.default_branch || "main", ...(body && body.only ? { inputs: { only: body.only } } : {}) });
     return { ok: true };
   }
   if (path === "/api/cloud/refresh") return { ok: true };
@@ -474,7 +477,7 @@ async function api(path, body) {
   return data;
 }
 
-const PAGE_VERSION = "0.6.0";
+const PAGE_VERSION = "0.8.0";
 function showProblem(msg) {
   $("#banners").innerHTML = `<div class="banner bad"><div class="grow">${msg}</div></div>`;
 }
@@ -618,7 +621,9 @@ function renderResults() {
       return `<div class="dest">
         <div><div class="dname">${esc(cityName(d.destination))}</div><div class="dcode">${esc((d.airports || [d.destination]).join(" · "))}</div>
           ${idx === 0 && priced > 1 ? '<span class="best">הכי זול</span>' : ""}</div>
-        <div>${priceCell}</div>
+        <div>${priceCell}
+          <button class="btn small checkone" type="button" data-watch="${esc(d.watch)}"
+            ${state.running || !state.keys.SERPAPI_KEY ? "disabled" : ""}>🔍 בדוק רק את זה</button></div>
         <div class="detail">${detail}</div>
         <div class="spark-wrap">${spark(d.trend)}
           <div class="cover">נבדקו ${d.checked} מתוך ${d.total} שילובים<div class="meter"><div style="width:${pct}%"></div></div></div></div>
@@ -629,7 +634,19 @@ function renderResults() {
   }).join("") + `<div class="card"><h2>הבדיקה האחרונה${state.cloud ? " (בענן)" : ""}</h2><pre>${esc(state.last_output || "עוד לא הייתה בדיקה.")}</pre></div>`;
 }
 
+async function checkOne(watch, label) {
+  try {
+    const r = await api("/api/check", { only: watch });
+    toast(r.ok ? `בודק רק את ${label}...` : "כבר רצה בדיקה");
+    refresh();
+  } catch (e) { toast(e.message); }
+}
+
 function toggleOpen(key) { open[key] = !open[key]; renderResults(); }
+document.addEventListener("click", e => {
+  const b = e.target.closest(".checkone");
+  if (b && !b.disabled) { b.disabled = true; checkOne(b.dataset.watch, b.closest(".dest").querySelector(".dname").textContent); }
+});
 
 /* ---------- trips ---------- */
 function combos(t) {   // same count as the Python planner: the whole trip inside the dates
